@@ -490,8 +490,9 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let territory = &mut colony.territory;
   let territory_path_size = colony.territory_path_size;
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()), |pos, start_pos, path_size, _| {
-    if path_size < territory_path_size {
-      match (*world)[start_pos] {
+    let cell = (*world)[start_pos];
+    if path_size < territory_path_size && cell != Water {
+      match cell {
         AnthillWithAnt(player) => *territory.get_mut(pos) = player + 1,
         Ant(player) => *territory.get_mut(pos) = player + 1,
         _ => *territory.get_mut(pos) = 1
