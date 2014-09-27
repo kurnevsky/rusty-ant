@@ -8,8 +8,6 @@ use input::*;
 
 static GATHERING_FOOD_PATH_SIZE: uint = 16;
 
-static TERRITORY_PATH_SIZE: uint = 18;
-
 #[deriving(Clone)]
 struct Tag {
   start: uint,
@@ -27,6 +25,7 @@ pub struct Colony {
   pub spawn_radius2: uint,
   pub cur_turn: uint,
   view_path_size: uint,
+  territory_path_size: uint,
   enemies_count: uint, // Известное количество врагов.
   world: Vec<Cell>, // Текущее состояние мира. При ходе нашего муравья он передвигается на новую клетку.
   last_world: Vec<Cell>, // Предыдущее состояние мира со сделавшими ход нашими муравьями.
@@ -55,6 +54,7 @@ impl Colony {
       spawn_radius2: spawn_radius2,
       cur_turn: 0,
       view_path_size: ((view_radius2 * 2) as f32).sqrt().ceil() as uint,
+      territory_path_size: ((view_radius2 * 4) as f32).sqrt().ceil() as uint,
       enemies_count: 0,
       world: Vec::from_elem(len, Unknown),
       last_world: Vec::from_elem(len, Unknown),
@@ -488,9 +488,9 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let height = colony.height;
   let world = &mut colony.world;
   let territory = &mut colony.territory;
+  let territory_path_size = colony.territory_path_size;
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()), |pos, start_pos, path_size, _| {
-    let distance = euclidean(width, height, pos, start_pos);
-    if distance <= TERRITORY_PATH_SIZE {
+    if path_size < territory_path_size {
       match (*world)[start_pos] {
         AnthillWithAnt(player) => *territory.get_mut(pos) = player + 1,
         Ant(player) => *territory.get_mut(pos) = player + 1,
