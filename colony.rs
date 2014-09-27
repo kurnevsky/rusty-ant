@@ -26,6 +26,7 @@ pub struct Colony {
   pub attack_radius2: uint,
   pub spawn_radius2: uint,
   pub cur_turn: uint,
+  view_path_size: uint,
   enemies_count: uint, // Известное количество врагов.
   world: Vec<Cell>, // Текущее состояние мира. При ходе нашего муравья он передвигается на новую клетку.
   last_world: Vec<Cell>, // Предыдущее состояние мира со сделавшими ход нашими муравьями.
@@ -53,6 +54,7 @@ impl Colony {
       attack_radius2: attack_radius2,
       spawn_radius2: spawn_radius2,
       cur_turn: 0,
+      view_path_size: ((view_radius2 * 2) as f32).sqrt().ceil() as uint,
       enemies_count: 0,
       world: Vec::from_elem(len, Unknown),
       last_world: Vec::from_elem(len, Unknown),
@@ -289,13 +291,14 @@ fn is_free(cell: Cell) -> bool {
   }
 }*/
 
-fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec<Cell>, visible_area: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ant_pos: uint) -> Option<Direction> {
+fn discover_direction(width: uint, height: uint, view_radius2: uint, view_path_size: uint, world: &Vec<Cell>, visible_area: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ant_pos: uint) -> Option<Direction> {
   let mut n_score = 0u;
   let mut s_score = 0u;
   let mut w_score = 0u;
   let mut e_score = 0u;
   let ant_point = from_pos(width, ant_pos);
-  simple_wave(width, height, tags, tagged, ant_pos, |pos, _, prev| {
+  let view_path_size = 
+  simple_wave(width, height, tags, tagged, ant_pos, |pos, path_size, prev| {
     let point = from_pos(width, pos);
     let distance = point_euclidean(width, height, point, ant_point);
     if distance > view_radius2 {
@@ -315,7 +318,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
       let prev_distance = point_euclidean(width, height, point, prev_point);
       prev_distance <= view_radius2
     } else {
-      world[pos] != Water
+      world[pos] != Water && path_size < view_path_size
     }
   }, |_, _, _| { false });
   clear_tags(tags, tagged);
@@ -470,7 +473,7 @@ fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     if colony.moved[pos] {
       continue;
     }
-    match discover_direction(colony.width, colony.height, colony.view_radius2, &colony.world, &colony.visible_area, &mut colony.tags, &mut colony.tagged, pos) {
+    match discover_direction(colony.width, colony.height, colony.view_radius2, colony.view_path_size, &colony.world, &colony.visible_area, &mut colony.tags, &mut colony.tagged, pos) {
       Some(d) => move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, d),
       None => { }
     }
