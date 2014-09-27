@@ -299,6 +299,9 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, view_path_s
   let ant_point = from_pos(width, ant_pos);
   let view_path_size = 
   simple_wave(width, height, tags, tagged, ant_pos, |pos, path_size, prev| {
+    if path_size >= view_path_size {
+      return false;
+    }
     let point = from_pos(width, pos);
     let distance = point_euclidean(width, height, point, ant_point);
     if distance > view_radius2 {
@@ -318,7 +321,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, view_path_s
       let prev_distance = point_euclidean(width, height, point, prev_point);
       prev_distance <= view_radius2
     } else {
-      world[pos] != Water && path_size < view_path_size
+      world[pos] != Water
     }
   }, |_, _, _| { false });
   clear_tags(tags, tagged);
