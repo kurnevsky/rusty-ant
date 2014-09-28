@@ -1,5 +1,6 @@
 use std::*;
 use std::collections::*;
+use std::rand::*;
 use point::*;
 use direction::*;
 use cell::*;
@@ -14,7 +15,8 @@ static ATTACK_ANTHILLS_PATH_SIZE: uint = 10;
 struct Tag {
   start: uint,
   prev: uint,
-  length: uint
+  length: uint,
+  general: uint
 }
 
 pub struct Colony {
@@ -26,6 +28,7 @@ pub struct Colony {
   pub attack_radius2: uint,
   pub spawn_radius2: uint,
   pub cur_turn: uint,
+  rng: XorShiftRng,
   territory_path_size: uint,
   enemies_count: uint, // Известное количество врагов.
   world: Vec<Cell>, // Текущее состояние мира. При ходе нашего муравья он передвигается на новую клетку.
@@ -55,7 +58,8 @@ impl Colony {
       attack_radius2: attack_radius2,
       spawn_radius2: spawn_radius2,
       cur_turn: 0,
-      territory_path_size: ((view_radius2 * 4) as f32).sqrt().ceil() as uint,
+      rng: SeedableRng::from_seed([1, 2, 3, 4]),
+      territory_path_size: 2 * ((view_radius2 * 2) as f32).sqrt().ceil() as uint,
       enemies_count: 0,
       world: Vec::from_elem(len, Unknown),
       last_world: Vec::from_elem(len, Unknown),
@@ -64,7 +68,7 @@ impl Colony {
       moved: Vec::from_elem(len, false),
       gathered_food: Vec::from_elem(len, 0u),
       territory: Vec::from_elem(len, 0u),
-      tags: Vec::from_elem(len, Tag { start: 0, prev: 0, length: 0 }),
+      tags: Vec::from_elem(len, Tag { start: 0, prev: 0, length: 0, general: 0 }),
       tagged: DList::new(),
       ours_ants: DList::new(),
       enemies_ants: DList::new(),
@@ -194,10 +198,10 @@ fn euclidean(width: uint, height: uint, pos1: uint, pos2: uint) -> uint {
   point_euclidean(width, height, point1, point2)
 }
 
-fn wave<'r, T: Iterator<&'r uint>>(width: uint, height: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, start: &mut T, cond: |uint, uint, uint, uint| -> bool, stop_cond: |uint, uint, uint, uint| -> bool) -> Option<uint> {
+fn wave<'r, T: Iterator<&'r uint>>(width: uint, height: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, start: &mut T, cond: |uint, uint, uint, uint, uint, &mut uint| -> bool, stop_cond: |uint, uint, uint, uint| -> bool) -> Option<uint> {
   let mut q = DList::new();
   for &pos in *start {
-    if cond(pos, pos, 0, pos) {
+    if cond(pos, pos, 0, pos, 0, &mut tags.get_mut(pos).general) {
       q.push(pos);
       let tag = tags.get_mut(pos);
       tag.start = pos;
@@ -214,7 +218,7 @@ fn wave<'r, T: Iterator<&'r uint>>(width: uint, height: uint, tags: &mut Vec<Tag
     }
     let start_pos = tag.start;
     let n_pos = n(width, height, pos);
-    if (*tags)[n_pos].length == 0 && cond(n_pos, start_pos, tag.length, pos) {
+    if (*tags)[n_pos].length == 0 && cond(n_pos, start_pos, tag.length, pos, (*tags)[pos].general, &mut tags.get_mut(n_pos).general) {
       let n_tag = tags.get_mut(n_pos);
       n_tag.start = start_pos;
       n_tag.prev = pos;
@@ -223,7 +227,7 @@ fn wave<'r, T: Iterator<&'r uint>>(width: uint, height: uint, tags: &mut Vec<Tag
       q.push(n_pos);
     }
     let w_pos = w(width, pos);
-    if (*tags)[w_pos].length == 0 && cond(w_pos, start_pos, tag.length, pos) {
+    if (*tags)[w_pos].length == 0 && cond(w_pos, start_pos, tag.length, pos, (*tags)[pos].general, &mut tags.get_mut(w_pos).general) {
       let w_tag = tags.get_mut(w_pos);
       w_tag.start = start_pos;
       w_tag.prev = pos;
@@ -232,7 +236,7 @@ fn wave<'r, T: Iterator<&'r uint>>(width: uint, height: uint, tags: &mut Vec<Tag
       q.push(w_pos);
     }
     let s_pos = s(width, height, pos);
-    if (*tags)[s_pos].length == 0 && cond(s_pos, start_pos, tag.length, pos) {
+    if (*tags)[s_pos].length == 0 && cond(s_pos, start_pos, tag.length, pos, (*tags)[pos].general, &mut tags.get_mut(s_pos).general) {
       let s_tag = tags.get_mut(s_pos);
       s_tag.start = start_pos;
       s_tag.prev = pos;
@@ -241,7 +245,7 @@ fn wave<'r, T: Iterator<&'r uint>>(width: uint, height: uint, tags: &mut Vec<Tag
       q.push(s_pos);
     }
     let e_pos = e(width, pos);
-    if (*tags)[e_pos].length == 0 && cond(e_pos, start_pos, tag.length, pos) {
+    if (*tags)[e_pos].length == 0 && cond(e_pos, start_pos, tag.length, pos, (*tags)[pos].general, &mut tags.get_mut(e_pos).general) {
       let e_tag = tags.get_mut(e_pos);
       e_tag.start = start_pos;
       e_tag.prev = pos;
@@ -253,8 +257,8 @@ fn wave<'r, T: Iterator<&'r uint>>(width: uint, height: uint, tags: &mut Vec<Tag
   return None;
 }
 
-fn simple_wave(width: uint, height: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, start: uint, cond: |uint, uint, uint| -> bool, stop_cond: |uint, uint, uint| -> bool) -> Option<uint> {
-  wave(width, height, tags, tagged, &mut Some(start).iter(), |pos, _, path_size, prev| { cond(pos, path_size, prev) }, |pos, _, path_size, prev| { stop_cond(pos, path_size, prev) })
+fn simple_wave(width: uint, height: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, start: uint, cond: |uint, uint, uint, uint, &mut uint| -> bool, stop_cond: |uint, uint, uint| -> bool) -> Option<uint> {
+  wave(width, height, tags, tagged, &mut Some(start).iter(), |pos, _, path_size, prev, prev_general_tag, general_tag| { cond(pos, path_size, prev, prev_general_tag, general_tag) }, |pos, _, path_size, prev| { stop_cond(pos, path_size, prev) })
 }
 
 fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut DList<uint>) {
@@ -263,6 +267,7 @@ fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut DList<uint>) {
     tag.start = 0;
     tag.prev = 0;
     tag.length = 0;
+    tag.general = 0;
   }
   tagged.clear();
 }
@@ -303,7 +308,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
   let w_pos = w(width, ant_pos);
   let e_pos = e(width, ant_pos);
   if is_free(world[n_pos]) {
-    simple_wave(width, height, tags, tagged, n_pos, |pos, path_size, prev| {
+    simple_wave(width, height, tags, tagged, n_pos, |pos, path_size, prev, _, _| {
       if pos == s(width, height, prev) || path_size > manhattan(width, height, n_pos, pos) || euclidean(width, height, n_pos, pos) > view_radius2 || world[pos] == Water {
         false
       } else {
@@ -316,7 +321,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
     clear_tags(tags, tagged);
   }
   if is_free(world[s_pos]) {
-    simple_wave(width, height, tags, tagged, s_pos, |pos, path_size, prev| {
+    simple_wave(width, height, tags, tagged, s_pos, |pos, path_size, prev, _, _| {
       if pos == n(width, height, prev) || path_size > manhattan(width, height, s_pos, pos) || euclidean(width, height, s_pos, pos) > view_radius2 || world[pos] == Water {
         false
       } else {
@@ -329,7 +334,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
     clear_tags(tags, tagged);
   }
   if is_free(world[w_pos]) {
-    simple_wave(width, height, tags, tagged, w_pos, |pos, path_size, prev| {
+    simple_wave(width, height, tags, tagged, w_pos, |pos, path_size, prev, _, _| {
       if pos == e(width, prev) || path_size > manhattan(width, height, w_pos, pos) || euclidean(width, height, w_pos, pos) > view_radius2 || world[pos] == Water {
         false
       } else {
@@ -342,7 +347,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
     clear_tags(tags, tagged);
   }
   if is_free(world[e_pos]) {
-    simple_wave(width, height, tags, tagged, e_pos, |pos, path_size, prev| {
+    simple_wave(width, height, tags, tagged, e_pos, |pos, path_size, prev, _, _| {
       if pos == w(width, prev) || path_size > manhattan(width, height, e_pos, pos) || euclidean(width, height, e_pos, pos) > view_radius2 || world[pos] == Water {
         false
       } else {
@@ -492,7 +497,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
     }
   }
   for &ant_pos in colony.ours_ants.iter() {
-    simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, _| {
+    simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, _, _, _| {
       let distance = euclidean(width, height, pos, ant_pos);
       if distance > view_radius2 {
         false
@@ -561,7 +566,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   }
 }
 
-fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) { //TODO: сделать так, чтобы рядомстоящие муравьи не исследовали одну и ту же область.
   for &pos in colony.ours_ants.iter() {
     if colony.moved[pos] {
       continue;
@@ -573,13 +578,18 @@ fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   }
 }
 
+fn is_ant(cell: Cell, player: uint) -> bool {
+  cell == Ant(player) || cell == AnthillWithAnt(player)
+}
+
 fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let width = colony.width;
   let height = colony.height;
   let world = &mut colony.world;
   let territory = &mut colony.territory;
   let territory_path_size = colony.territory_path_size;
-  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()).chain(colony.enemies_anthills.iter()), |pos, start_pos, path_size, _| {
+  let moved = &mut colony.moved;
+  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()).chain(colony.enemies_anthills.iter()), |pos, start_pos, path_size, _, _, _| {
     if path_size < territory_path_size && (*world)[pos] != Water {
       match (*world)[start_pos] {
         AnthillWithAnt(player) => *territory.get_mut(pos) = player + 1,
@@ -594,25 +604,47 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   }, |_, _, _, _| { false });
   clear_tags(&mut colony.tags, &mut colony.tagged);
   let mut path = DList::new();
+  let mut shuffled_ants = Vec::new();
   for &ant_pos in colony.ours_ants.iter() {
-    if colony.moved[ant_pos] {
+    if !(*moved)[ant_pos] {
+      shuffled_ants.push(ant_pos);
+    }
+  }
+  colony.rng.shuffle(shuffled_ants.as_mut_slice());
+  for &ant_pos in shuffled_ants.iter() {
+    if (*moved)[ant_pos] {
       continue;
     }
-    let goal = simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, path_size, _| {
-      if path_size == 1 {
-        is_free((*world)[pos])
+    let goal = simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, path_size, _, prev_general_tag, general_tag| {
+      let cell = (*world)[pos];
+      let prev_general_tag_or_start = prev_general_tag == 1 || pos == ant_pos;
+      if cell == Water || prev_general_tag_or_start && ((*moved)[pos] && is_ant(cell, 0) || cell == Food) {
+        false
       } else {
-        (*world)[pos] != Water
+        *general_tag = if prev_general_tag_or_start && is_ant(cell, 0) { 1 } else { 0 };
+        true
       }
     }, |pos, _, _| { (*territory)[pos] != 1 });
     if goal.is_none() {
       continue;
     }
     find_path(&mut colony.tags, ant_pos, goal.unwrap(), &mut path);
-    let next_ant_pos = path.pop_front().unwrap();
-    let direction = to_direction(width, height, ant_pos, next_ant_pos);
-    move(width, height, world, &mut colony.moved, output, ant_pos, direction);
     clear_tags(&mut colony.tags, &mut colony.tagged);
+    let mut moves = DList::new();
+    moves.push(ant_pos);
+    for &pos in path.iter() {
+      moves.push(pos);
+      let cell = (*world)[pos];
+      if cell != Ant(0) && cell != AnthillWithAnt(0) {
+        break;
+      }
+    }
+    while moves.len() > 1 {
+      let next_ant_pos = moves.pop().unwrap();
+      let pos = *moves.back().unwrap();
+      let direction = to_direction(width, height, pos, next_ant_pos);
+      move(width, height, world, moved, output, pos, direction);
+    }
   }
 }
 
@@ -621,7 +653,7 @@ fn attack_anthills<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let height = colony.height;
   let world = &mut colony.world;
   let moved = &mut colony.moved;
-  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_anthills.iter(), |pos, start_pos, path_size, prev| {
+  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_anthills.iter(), |pos, start_pos, path_size, prev, _, _| {
     match (*world)[pos] {
       Ant(0) | AnthillWithAnt(0) if !(*moved)[pos] => {
         if pos != start_pos && !is_free((*world)[prev]) {
@@ -670,7 +702,7 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
       *gathered_food.get_mut(e_pos) = pos + 1;
     }
   }
-  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.food.iter(), |pos, start_pos, path_size, prev| {
+  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.food.iter(), |pos, start_pos, path_size, prev, _, _| {
     match (*world)[pos] {
       Ant(0) | AnthillWithAnt(0) if (*gathered_food)[start_pos] == 0 && !(*moved)[pos] => {
         if pos != start_pos && !is_free((*world)[prev]) {
