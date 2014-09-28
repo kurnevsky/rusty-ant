@@ -515,9 +515,8 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let territory = &mut colony.territory;
   let territory_path_size = colony.territory_path_size;
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()).chain(colony.enemies_anthills.iter()), |pos, start_pos, path_size, _| {
-    let cell = (*world)[start_pos];
-    if path_size < territory_path_size && cell != Water {
-      match cell {
+    if path_size < territory_path_size && (*world)[pos] != Water {
+      match (*world)[start_pos] {
         AnthillWithAnt(player) => *territory.get_mut(pos) = player + 1,
         Ant(player) => *territory.get_mut(pos) = player + 1,
         Anthill(player) => *territory.get_mut(pos) = player + 1,
@@ -639,6 +638,102 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     move(width, height, world, moved, output, ant_pos, direction);
   }*/
   clear_tags(&mut colony.tags, &mut colony.tagged);
+}
+
+fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius2: uint, world: &Vec<Cell>) -> bool {
+  let distance = euclidean(width, height, pos1, pos2);
+  if distance <= attack_radius2 {
+    return true;
+  }
+  let n_pos1 = n(width, height, pos1);
+  let s_pos1 = s(width, height, pos1);
+  let w_pos1 = w(width, pos1);
+  let e_pos1 = e(width, pos1);
+  let n_pos2 = n(width, height, pos2);
+  let s_pos2 = s(width, height, pos2);
+  let w_pos2 = w(width, pos2);
+  let e_pos2 = e(width, pos2);
+  let n_pos1_water = world[n_pos1] == Water;
+  let s_pos1_water = world[s_pos1] == Water;
+  let w_pos1_water = world[w_pos1] == Water;
+  let e_pos1_water = world[e_pos1] == Water;
+  let n_pos2_water = world[n_pos2] == Water;
+  let s_pos2_water = world[s_pos2] == Water;
+  let w_pos2_water = world[w_pos2] == Water;
+  let e_pos2_water = world[e_pos2] == Water;
+  if !n_pos1_water {
+    let n_distance = euclidean(width, height, n_pos1, pos2);
+    if n_distance <= attack_radius2 {
+      return true;
+    }
+    if n_distance < distance {
+      if !s_pos2_water && euclidean(width, height, n_pos1, s_pos2) <= attack_radius2 {
+        return true;
+      }
+      if !w_pos2_water && euclidean(width, height, n_pos1, w_pos2) <= attack_radius2 {
+        return true;
+      }
+      if !e_pos2_water && euclidean(width, height, n_pos1, e_pos2) <= attack_radius2 {
+        return true;
+      }
+    }
+  }
+  if !s_pos1_water {
+    let s_distance = euclidean(width, height, s_pos1, pos2);
+    if s_distance <= attack_radius2 {
+      return true;
+    }
+    if s_distance < distance {
+      if !n_pos2_water && euclidean(width, height, s_pos1, n_pos2) <= attack_radius2 {
+        return true;
+      }
+      if !w_pos2_water && euclidean(width, height, s_pos1, w_pos2) <= attack_radius2 {
+        return true;
+      }
+      if !e_pos2_water && euclidean(width, height, s_pos1, e_pos2) <= attack_radius2 {
+        return true;
+      }
+    }
+  }
+  if !w_pos1_water {
+    let w_distance = euclidean(width, height, w_pos1, pos2);
+    if w_distance <= attack_radius2 {
+      return true;
+    }
+    if w_distance < distance {
+      if !e_pos2_water && euclidean(width, height, w_pos1, e_pos2) <= attack_radius2 {
+        return true;
+      }
+      if !n_pos2_water && euclidean(width, height, w_pos1, n_pos2) <= attack_radius2 {
+        return true;
+      }
+      if !s_pos2_water && euclidean(width, height, w_pos1, s_pos2) <= attack_radius2 {
+        return true;
+      }
+    }
+  }
+  if !e_pos1_water {
+    let e_distance = euclidean(width, height, e_pos1, pos2);
+    if e_distance <= attack_radius2 {
+      return true;
+    }
+    if e_distance < distance {
+      if !w_pos2_water && euclidean(width, height, e_pos1, w_pos2) <= attack_radius2 {
+        return true;
+      }
+      if !n_pos2_water && euclidean(width, height, e_pos1, n_pos2) <= attack_radius2 {
+        return true;
+      }
+      if !s_pos2_water && euclidean(width, height, e_pos1, s_pos2) <= attack_radius2 {
+        return true;
+      }
+    }
+  }
+  false
+}
+
+fn get_group<T: MutableSeq<uint>>(pos: uint, all_ours: &DList<uint>, all_enemies: &DList<uint>, groups: &mut Vec<bool>, ours: &mut T, enemies: &mut T) {
+  
 }
 
 pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
