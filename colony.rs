@@ -831,16 +831,35 @@ fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius
   false
 }
 
-fn find_in_one_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, groups: &mut Vec<bool>, ants: &DList<uint>, group: &mut T) {
-  for &pos in ants.iter() {
-    if !(*groups)[pos] && in_one_group(width, height, ant_pos, pos, attack_radius2, world) {
-      *groups.get_mut(pos) = true;
-      group.push(pos);
+fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, groups: &mut Vec<bool>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, group: &mut T, ours: bool) {
+  simple_wave(width, height, tags, tagged, ant_pos, |pos, path_size, prev, _, _| {
+    if !(*groups)[pos] {
+      match (*world)[pos] {
+        Ant(0) | AnthillWithAnt(0) => {
+          if ours && in_one_group(width, height, ant_pos, pos, attack_radius2, world) {
+            group.push(pos);
+            *groups.get_mut(pos) = true;
+          }
+        },
+        Ant(_) | AnthillWithAnt(_) => {
+          if !ours && in_one_group(width, height, ant_pos, pos, attack_radius2, world) {
+            group.push(pos);
+            *groups.get_mut(pos) = true;
+          }
+        },
+        _ => { }
+      }
     }
-  }
+    if euclidean(width, height, ant_pos, prev) <= attack_radius2 {
+      true
+    } else {
+      false
+    }
+  }, |_, _, _| { false });
+  clear_tags(tags, tagged);
 }
 
-fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, all_ours: &DList<uint>, all_enemies: &DList<uint>, groups: &mut Vec<bool>, ours: &mut T, enemies: &mut T) {
+fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, groups: &mut Vec<bool>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ours: &mut T, enemies: &mut T) {
   let mut ours_q = DList::new();
   let mut enemies_q = DList::new();
   ours_q.push(ant_pos);
@@ -848,12 +867,12 @@ fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, atta
     if !ours_q.is_empty() {
       let pos = ours_q.pop_front().unwrap();
       ours.push(pos);
-      find_in_one_group(width, height, pos, attack_radius2, world, groups, all_enemies, &mut enemies_q);
+      find_near_ants(width, height, pos, attack_radius2, world, groups, tags, tagged, &mut enemies_q, false);
     }
     if !enemies_q.is_empty() {
       let pos = enemies_q.pop_front().unwrap();
       enemies.push(pos);
-      find_in_one_group(width, height, pos, attack_radius2, world, groups, all_ours, &mut ours_q);
+      find_near_ants(width, height, pos, attack_radius2, world, groups, tags, tagged, &mut ours_q, true);
     }
   }
 }
