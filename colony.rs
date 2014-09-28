@@ -514,7 +514,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let world = &mut colony.world;
   let territory = &mut colony.territory;
   let territory_path_size = colony.territory_path_size;
-  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()), |pos, start_pos, path_size, _| {
+  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()).chain(colony.enemies_anthills.iter()), |pos, start_pos, path_size, _| {
     let cell = (*world)[start_pos];
     if path_size < territory_path_size && cell != Water {
       match cell {
