@@ -43,7 +43,7 @@ fn init(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<Box<Col
   let mut view_radius2 = None;
   let mut attack_radius2 = None;
   let mut spawn_radius2 = None;
-  let mut seed = None;
+  let mut seed: Option<i64> = None;
   loop {
     let input = read_nonempty_line(reader);
     let split: Vec<&str> = input.as_slice().trim().split(' ').collect();
@@ -73,7 +73,8 @@ fn init(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<Box<Col
           turns.unwrap(),
           view_radius2.unwrap(),
           attack_radius2.unwrap(),
-          spawn_radius2.unwrap()
+          spawn_radius2.unwrap(),
+          seed.unwrap() as u64
         ));
       },
       "loadtime" => {
@@ -152,7 +153,7 @@ fn init(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<Box<Col
         if split.len() != 2 {
           return None;
         }
-        match from_str::<uint>(split[1]) {
+        match from_str::<i64>(split[1]) {
           Some(x) => seed = Some(x),
           None => return None
         }

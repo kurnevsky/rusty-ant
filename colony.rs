@@ -50,7 +50,7 @@ pub struct Colony {
 }
 
 impl Colony {
-  pub fn new(width: uint, height: uint, turn_time: uint, turns_count: uint, view_radius2: uint, attack_radius2: uint, spawn_radius2: uint) -> Colony {
+  pub fn new(width: uint, height: uint, turn_time: uint, turns_count: uint, view_radius2: uint, attack_radius2: uint, spawn_radius2: uint, seed: u64) -> Colony {
     let len = length(width, height);
     Colony {
       width: width,
@@ -61,7 +61,7 @@ impl Colony {
       attack_radius2: attack_radius2,
       spawn_radius2: spawn_radius2,
       cur_turn: 0,
-      rng: SeedableRng::from_seed([1, 2, 3, 4]),
+      rng: SeedableRng::from_seed([1, ((seed >> 32) & 0xFFFFFFFF) as u32, 3, (seed & 0xFFFFFFFF) as u32]),
       territory_path_size: ((view_radius2 * 2 * TERRITORY_PATH_SIZE_CONST) as f32).sqrt().ceil() as uint,
       enemies_count: 0,
       world: Vec::from_elem(len, Unknown),
