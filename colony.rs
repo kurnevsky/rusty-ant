@@ -38,6 +38,7 @@ pub struct Colony {
   tagged: DList<uint>, // Список позиций start_tags и path_tags с ненулевыми значениями.
   ours_ants: DList<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
   enemies_ants: DList<uint>,
+  enemies_anthills: DList<uint>,
   food: DList<uint> // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
 }
 
@@ -67,6 +68,7 @@ impl Colony {
       tagged: DList::new(),
       ours_ants: DList::new(),
       enemies_ants: DList::new(),
+      enemies_anthills: DList::new(),
       food: DList::new()
     }
   }
@@ -297,7 +299,6 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, view_path_s
   let mut w_score = 0u;
   let mut e_score = 0u;
   let ant_point = from_pos(width, ant_pos);
-  let view_path_size = 
   simple_wave(width, height, tags, tagged, ant_pos, |pos, path_size, prev| {
     if path_size >= view_path_size {
       return false;
@@ -412,8 +413,11 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
       InputAnthill(point, player) => {
         let pos = to_pos(width, point);
         *colony.world.get_mut(pos) = if colony.world[pos] == Ant(player) { AnthillWithAnt(player) } else { Anthill(player) };
-        if player > colony.enemies_count {
-          colony.enemies_count = player;
+        if player != 0 {
+          colony.enemies_anthills.push(pos);
+          if player > colony.enemies_count {
+            colony.enemies_count = player;
+          }
         }
       },
       InputAnt(point, player) => {
@@ -455,16 +459,34 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
         _ => *colony.standing_ants.get_mut(pos) = 0
       }
     } else {
-      let last_cell = colony.last_world[pos];
-      if last_cell == Water {
-        *visible_area.get_mut(pos) = 0;
-      }
-      if last_cell == Food {
-        colony.food.push(pos);
-      }
-      *colony.world.get_mut(pos) = match last_cell {
+      *colony.world.get_mut(pos) = match colony.last_world[pos] {
+         Water => {
+          *visible_area.get_mut(pos) = 0;
+          Water
+        },
+        Food => {
+          colony.food.push(pos);
+          Food
+        },
+        Land => Land,
+        Unknown => Unknown,
         Ant(0) | AnthillWithAnt(0) => Land,
-        _ => last_cell
+        Anthill(0) => {
+          Anthill(0)
+        },
+        Ant(player) => {
+          colony.enemies_ants.push(pos);
+          Ant(player)
+        },
+        Anthill(player) => {
+          colony.enemies_anthills.push(pos);
+          Anthill(player)
+        }
+        AnthillWithAnt(player) => {
+          colony.enemies_anthills.push(pos);
+          colony.enemies_ants.push(pos);
+          AnthillWithAnt(player)
+        }
       };
       *colony.standing_ants.get_mut(pos) = 0;
     }
