@@ -11,6 +11,8 @@ static GATHERING_FOOD_PATH_SIZE: uint = 30;
 
 static ATTACK_ANTHILLS_PATH_SIZE: uint = 10;
 
+static TERRITORY_PATH_SIZE_CONST: uint = 6;
+
 #[deriving(Clone)]
 struct Tag {
   start: uint,
@@ -59,7 +61,7 @@ impl Colony {
       spawn_radius2: spawn_radius2,
       cur_turn: 0,
       rng: SeedableRng::from_seed([1, 2, 3, 4]),
-      territory_path_size: 2 * ((view_radius2 * 2) as f32).sqrt().ceil() as uint,
+      territory_path_size: ((view_radius2 * 2 * TERRITORY_PATH_SIZE_CONST) as f32).sqrt().ceil() as uint,
       enemies_count: 0,
       world: Vec::from_elem(len, Unknown),
       last_world: Vec::from_elem(len, Unknown),
