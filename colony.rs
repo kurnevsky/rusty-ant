@@ -520,6 +520,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
       match cell {
         AnthillWithAnt(player) => *territory.get_mut(pos) = player + 1,
         Ant(player) => *territory.get_mut(pos) = player + 1,
+        Anthill(player) => *territory.get_mut(pos) = player + 1,
         _ => *territory.get_mut(pos) = 1
       }
       true
