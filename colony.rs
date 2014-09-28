@@ -40,6 +40,7 @@ pub struct Colony {
   moved: Vec<bool>, // Помечаются флагом клетки, откуда сделал ход наш муравей, а также куда он сделал ход.
   gathered_food: Vec<uint>, // Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1.
   territory: Vec<uint>,
+  groups: Vec<bool>,
   tags: Vec<Tag>,
   tagged: DList<uint>, // Список позиций start_tags и path_tags с ненулевыми значениями.
   ours_ants: DList<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
@@ -70,6 +71,7 @@ impl Colony {
       moved: Vec::from_elem(len, false),
       gathered_food: Vec::from_elem(len, 0u),
       territory: Vec::from_elem(len, 0u),
+      groups: Vec::from_elem(len, false),
       tags: Vec::from_elem(len, Tag { start: 0, prev: 0, length: 0, general: 0 }),
       tagged: DList::new(),
       ours_ants: DList::new(),
@@ -457,6 +459,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
     *colony.gathered_food.get_mut(pos) = 0;
     *visible_area.get_mut(pos) += 1;
     *colony.territory.get_mut(pos) = 0;
+    *colony.groups.get_mut(pos) = false;
   }
   colony.ours_ants.clear();
   colony.enemies_ants.clear();
@@ -860,6 +863,8 @@ fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint,
 }
 
 fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, groups: &mut Vec<bool>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ours: &mut T, enemies: &mut T) {
+  ours.clear();
+  enemies.clear();
   let mut ours_q = DList::new();
   let mut enemies_q = DList::new();
   ours_q.push(ant_pos);
@@ -874,6 +879,18 @@ fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, atta
       enemies.push(pos);
       find_near_ants(width, height, pos, attack_radius2, world, groups, tags, tagged, &mut ours_q, true);
     }
+  }
+}
+
+fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+  let mut ours = Vec::new();
+  let mut enemies = Vec::new();
+  for &pos in colony.ours_ants.iter() {
+    if colony.groups[pos] {
+      continue;
+    }
+    get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &mut colony.groups, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
+    //TODO
   }
 }
 
