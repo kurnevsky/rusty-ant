@@ -6,7 +6,9 @@ use cell::*;
 use move::*;
 use input::*;
 
-static GATHERING_FOOD_PATH_SIZE: uint = 16;
+static GATHERING_FOOD_PATH_SIZE: uint = 30;
+
+static ATTACK_ANTHILLS_PATH_SIZE: uint = 10;
 
 #[deriving(Clone)]
 struct Tag {
@@ -549,7 +551,26 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
 }
 
 fn attack_anthills<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
-  
+  let width = colony.width;
+  let height = colony.height;
+  let world = &mut colony.world;
+  let moved = &mut colony.moved;
+  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_anthills.iter(), |pos, start_pos, path_size, prev| {
+    match (*world)[pos] {
+      Ant(0) | AnthillWithAnt(0) if !(*moved)[pos] => {
+        if pos != start_pos && !is_free((*world)[prev]) {
+          false
+        } else {
+          let direction = to_direction(width, height, pos, prev);
+          move(width, height, world, moved, output, pos, direction);
+          true
+        }
+      },
+      Unknown | Water => false,
+      _ => path_size <= ATTACK_ANTHILLS_PATH_SIZE
+    }
+  }, |_, _, _, _| { false });
+  clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
 fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
@@ -583,17 +604,23 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
       *gathered_food.get_mut(e_pos) = pos + 1;
     }
   }
-  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.food.iter(), |pos, start_pos, path_size, _| {
+  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.food.iter(), |pos, start_pos, path_size, prev| {
     match (*world)[pos] {
       Ant(0) | AnthillWithAnt(0) if (*gathered_food)[start_pos] == 0 && !(*moved)[pos] => {
-        *gathered_food.get_mut(start_pos) = pos + 1;
-        true
+        if pos != start_pos && !is_free((*world)[prev]) {
+          false
+        } else {
+          let direction = to_direction(width, height, pos, prev);
+          move(width, height, world, moved, output, pos, direction);
+          *gathered_food.get_mut(start_pos) = pos + 1;
+          true
+        }
       },
       Unknown | Water => false,
       _ => path_size <= GATHERING_FOOD_PATH_SIZE
     }
   }, |_, _, _, _| { false });
-  let mut path = DList::new();
+  /*let mut path = DList::new();
   for &food_pos in colony.food.iter() {
     let mut ant_pos = (*gathered_food)[food_pos];
     if ant_pos == 0 {
@@ -608,7 +635,7 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     let next_ant_pos = path.pop().unwrap();
     let direction = to_direction(width, height, ant_pos, next_ant_pos);
     move(width, height, world, moved, output, ant_pos, direction);
-  }
+  }*/
   clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
@@ -616,6 +643,7 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colo
   output.clear();
   colony.cur_turn += 1;
   update_world(colony, input);
+  attack_anthills(colony, output);
   gather_food(colony, output);
   discover(colony, output);
   travel(colony, output);
