@@ -26,7 +26,6 @@ pub struct Colony {
   pub attack_radius2: uint,
   pub spawn_radius2: uint,
   pub cur_turn: uint,
-  view_path_size: uint,
   territory_path_size: uint,
   enemies_count: uint, // Известное количество врагов.
   world: Vec<Cell>, // Текущее состояние мира. При ходе нашего муравья он передвигается на новую клетку.
@@ -56,7 +55,6 @@ impl Colony {
       attack_radius2: attack_radius2,
       spawn_radius2: spawn_radius2,
       cur_turn: 0,
-      view_path_size: ((view_radius2 * 2) as f32).sqrt().ceil() as uint,
       territory_path_size: ((view_radius2 * 4) as f32).sqrt().ceil() as uint,
       enemies_count: 0,
       world: Vec::from_elem(len, Unknown),
@@ -295,17 +293,72 @@ fn is_free(cell: Cell) -> bool {
   }
 }*/
 
-fn discover_direction(width: uint, height: uint, view_radius2: uint, view_path_size: uint, world: &Vec<Cell>, visible_area: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ant_pos: uint) -> Option<Direction> {
+fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec<Cell>, visible_area: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ant_pos: uint) -> Option<Direction> {
   let mut n_score = 0u;
   let mut s_score = 0u;
   let mut w_score = 0u;
   let mut e_score = 0u;
-  let ant_point = from_pos(width, ant_pos);
-  simple_wave(width, height, tags, tagged, ant_pos, |pos, path_size, prev| {
-    if path_size >= view_path_size {
+  let n_pos = n(width, height, ant_pos);
+  let s_pos = s(width, height, ant_pos);
+  let w_pos = w(width, ant_pos);
+  let e_pos = e(width, ant_pos);
+  if is_free(world[n_pos]) {
+    simple_wave(width, height, tags, tagged, n_pos, |pos, path_size, prev| {
+      if pos == s(width, height, prev) || path_size > manhattan(width, height, n_pos, pos) || euclidean(width, height, n_pos, pos) > view_radius2 || world[pos] == Water {
+        false
+      } else {
+        if euclidean(width, height, ant_pos, pos) > view_radius2 {
+          n_score += visible_area[pos];
+        }
+        true
+      }
+    }, |_, _, _| { false });
+    clear_tags(tags, tagged);
+  }
+  if is_free(world[s_pos]) {
+    simple_wave(width, height, tags, tagged, s_pos, |pos, path_size, prev| {
+      if pos == n(width, height, prev) || path_size > manhattan(width, height, s_pos, pos) || euclidean(width, height, s_pos, pos) > view_radius2 || world[pos] == Water {
+        false
+      } else {
+        if euclidean(width, height, ant_pos, pos) > view_radius2 {
+          s_score += visible_area[pos];
+        }
+        true
+      }
+    }, |_, _, _| { false });
+    clear_tags(tags, tagged);
+  }
+  if is_free(world[w_pos]) {
+    simple_wave(width, height, tags, tagged, w_pos, |pos, path_size, prev| {
+      if pos == e(width, prev) || path_size > manhattan(width, height, w_pos, pos) || euclidean(width, height, w_pos, pos) > view_radius2 || world[pos] == Water {
+        false
+      } else {
+        if euclidean(width, height, ant_pos, pos) > view_radius2 {
+          w_score += visible_area[pos];
+        }
+        true
+      }
+    }, |_, _, _| { false });
+    clear_tags(tags, tagged);
+  }
+  if is_free(world[e_pos]) {
+    simple_wave(width, height, tags, tagged, e_pos, |pos, path_size, prev| {
+      if pos == w(width, prev) || path_size > manhattan(width, height, e_pos, pos) || euclidean(width, height, e_pos, pos) > view_radius2 || world[pos] == Water {
+        false
+      } else {
+        if euclidean(width, height, ant_pos, pos) > view_radius2 {
+          e_score += visible_area[pos];
+        }
+        true
+      }
+    }, |_, _, _| { false });
+    clear_tags(tags, tagged);
+  }
+  /*simple_wave(width, height, tags, tagged, ant_pos, |pos, path_size, prev| {
+    let point = from_pos(width, pos);
+    if path_size > point_manhattan(width, height, point, ant_point) {
       return false;
     }
-    let point = from_pos(width, pos);
     let distance = point_euclidean(width, height, point, ant_point);
     if distance > view_radius2 {
       if point_euclidean(width, height, point, point_n(height, ant_point)) <= view_radius2 {
@@ -339,7 +392,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, view_path_s
   }
   if !is_free(world[e(width, ant_pos)]) {
     e_score = 0;
-  }
+  }*/
   if n_score == 0 && s_score == 0 && w_score == 0 && e_score == 0 {
     None
   } else if n_score >= s_score && n_score >= w_score && n_score >= e_score {
@@ -438,7 +491,19 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
       InputDead(_, _) => { }
     }
   }
-  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter(), |pos, start_pos, _, _| {
+  for &ant_pos in colony.ours_ants.iter() {
+    simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, _| {
+      let distance = euclidean(width, height, pos, ant_pos);
+      if distance > view_radius2 {
+        false
+      } else {
+        *visible_area.get_mut(pos) = 0;
+        true
+      }
+    }, |_, _, _| { false });
+    clear_tags(&mut colony.tags, &mut colony.tagged);
+  }
+  /*wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter(), |pos, start_pos, _, _| {
     let distance = euclidean(width, height, pos, start_pos);
     if distance > view_radius2 {
       false
@@ -447,7 +512,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
       true
     }
   }, |_, _, _, _| { false });
-  clear_tags(&mut colony.tags, &mut colony.tagged);
+  clear_tags(&mut colony.tags, &mut colony.tagged);*/
   for pos in range(0u, len) {
     if (*visible_area)[pos] == 0 {
       if colony.world[pos] == Unknown {
@@ -501,7 +566,7 @@ fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     if colony.moved[pos] {
       continue;
     }
-    match discover_direction(colony.width, colony.height, colony.view_radius2, colony.view_path_size, &colony.world, &colony.visible_area, &mut colony.tags, &mut colony.tagged, pos) {
+    match discover_direction(colony.width, colony.height, colony.view_radius2, &colony.world, &colony.visible_area, &mut colony.tags, &mut colony.tagged, pos) {
       Some(d) => move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, d),
       None => { }
     }
