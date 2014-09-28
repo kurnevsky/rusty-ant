@@ -400,6 +400,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   }
   colony.ours_ants.clear();
   colony.enemies_ants.clear();
+  colony.enemies_anthills.clear();
   colony.food.clear();
   for &i in *input {
     match i {
