@@ -415,22 +415,22 @@ fn move<T: MutableSeq<Move>>(width: uint, height: uint, world: &mut Vec<Cell>, m
   match direction {
     North => {
       let n_pos = n(width, height, pos);
-      *world.get_mut(n_pos) = Ant(0);
+      *world.get_mut(n_pos) = if (*world)[n_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
       *moved.get_mut(n_pos) = true;
     },
     West => {
       let w_pos = w(width, pos);
-      *world.get_mut(w_pos) = Ant(0);
+      *world.get_mut(w_pos) = if (*world)[w_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
       *moved.get_mut(w_pos) = true;
     },
     South => {
       let s_pos = s(width, height, pos);
-      *world.get_mut(s_pos) = Ant(0);
+      *world.get_mut(s_pos) = if (*world)[s_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
       *moved.get_mut(s_pos) = true;
     },
     East => {
       let e_pos = e(width, pos);
-      *world.get_mut(e_pos) = Ant(0);
+      *world.get_mut(e_pos) = if (*world)[e_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
       *moved.get_mut(e_pos) = true;
     }
   }
