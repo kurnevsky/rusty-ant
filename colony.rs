@@ -831,8 +831,31 @@ fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius
   false
 }
 
-fn get_group<T: MutableSeq<uint>>(pos: uint, all_ours: &DList<uint>, all_enemies: &DList<uint>, groups: &mut Vec<bool>, ours: &mut T, enemies: &mut T) {
-  
+fn find_in_one_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, groups: &mut Vec<bool>, ants: &DList<uint>, group: &mut T) {
+  for &pos in ants.iter() {
+    if !(*groups)[pos] && in_one_group(width, height, ant_pos, pos, attack_radius2, world) {
+      *groups.get_mut(pos) = true;
+      group.push(pos);
+    }
+  }
+}
+
+fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, all_ours: &DList<uint>, all_enemies: &DList<uint>, groups: &mut Vec<bool>, ours: &mut T, enemies: &mut T) {
+  let mut ours_q = DList::new();
+  let mut enemies_q = DList::new();
+  ours_q.push(ant_pos);
+  while !ours_q.is_empty() || !enemies_q.is_empty() {
+    if !ours_q.is_empty() {
+      let pos = ours_q.pop_front().unwrap();
+      ours.push(pos);
+      find_in_one_group(width, height, pos, attack_radius2, world, groups, all_enemies, &mut enemies_q);
+    }
+    if !enemies_q.is_empty() {
+      let pos = enemies_q.pop_front().unwrap();
+      enemies.push(pos);
+      find_in_one_group(width, height, pos, attack_radius2, world, groups, all_ours, &mut ours_q);
+    }
+  }
 }
 
 pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
