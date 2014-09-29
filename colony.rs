@@ -1044,13 +1044,13 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &mut colony.groups, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     if !enemies.is_empty() {
       alpha = int::MIN;
-      minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, colony.attack_radius2, &mut colony.board, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves)
-    }
-    for i in range(0u, ours.len()) {
-      let pos = ours[i];
-      let next_pos = best_moves[i];
-      let direction = to_direction(colony.width, colony.height, pos, next_pos);
-      move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, direction);
+      minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, colony.attack_radius2, &mut colony.board, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves);
+      for i in range(0u, ours.len()) {
+        let pos = ours[i];
+        let next_pos = best_moves[i];
+        let direction = to_direction(colony.width, colony.height, pos, next_pos);
+        move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, direction);
+      }
     }
   }
 }
@@ -1059,6 +1059,7 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colo
   output.clear();
   colony.cur_turn += 1;
   update_world(colony, input);
+  attack(colony, output);
   attack_anthills(colony, output);
   gather_food(colony, output);
   discover(colony, output);
