@@ -960,33 +960,74 @@ fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &
   let s_pos = s(width, height, pos);
   let w_pos = w(width, pos);
   let e_pos = e(width, pos);
-  if !is_water_or_food(n_pos) && board[n_pos].ant == 0 {
+  if !is_water_or_food(world[n_pos]) && board[n_pos].ant == 0 {
     moves.push(n_pos);
   }
-  if !is_water_or_food(w_pos) && board[w_pos].ant == 0 {
+  if !is_water_or_food(world[w_pos]) && board[w_pos].ant == 0 {
     moves.push(w_pos);
   }
-  if !is_water_or_food(s_pos) && board[s_pos].ant == 0 {
+  if !is_water_or_food(world[s_pos]) && board[s_pos].ant == 0 {
     moves.push(s_pos);
   }
-  if !is_water_or_food(e_pos) && board[e_pos].ant == 0 {
+  if !is_water_or_food(world[e_pos]) && board[e_pos].ant == 0 {
     moves.push(e_pos);
   }
 }
 
-fn minimax_min(width: uint, height: uint, idx: uint, ours_moved: &DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, board: &mut Vec<BoardCell>) {
-  if idx < enemies.len() {
-    
-  } else {
-    
+fn ant_owner(cell: Cell) -> Option<uint> {
+  match cell {
+    Ant(player) => Some(player),
+    AnthillWithAnt(player) => Some(player),
+    _ => None
   }
 }
 
-fn minimax_max(width: uint, height: uint, idx: uint, ours: &Vec<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, board: &mut Vec<BoardCell>) {
-  if idx < ours.len() {
-    
+fn minimax_min(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, attack_radius2: uint, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: int) -> int {
+  if idx < enemies.len() {
+    let pos = enemies[idx];
+    let mut moves = DList::new();
+    get_moves(width, height, pos, world, board, &mut moves);
+    let mut min_estimate = int::MAX;
+    for &next_pos in moves.iter() {
+      moved.push(next_pos);
+      board.get_mut(next_pos).ant = ant_owner(world[pos]).unwrap() + 1;
+      let cur_estimate = minimax_min(width, height, idx + 1, moved, enemies, world, attack_radius2, board, tags, tagged, alpha);
+      board.get_mut(next_pos).ant = 0;
+      moved.pop();
+      if cur_estimate <= min_estimate {
+        min_estimate = cur_estimate;
+        if cur_estimate <= alpha {
+          break;
+        }
+      }
+    }
+    min_estimate
   } else {
-    
+    estimate(width, height, world, attack_radius2, moved, board, tags, tagged)
+  }
+}
+
+fn minimax_max(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, attack_radius2: uint, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: &mut int, best_moves: &mut Vec<uint>) {
+  if idx < ours.len() {
+    let pos = ours[idx];
+    let mut moves = DList::new();
+    get_moves(width, height, pos, world, board, &mut moves);
+    for &next_pos in moves.iter() {
+      moved.push(next_pos);
+      board.get_mut(next_pos).ant = 1;
+      minimax_max(width, height, idx + 1, moved, ours, enemies, world, attack_radius2, board, tags, tagged, alpha, best_moves);
+      board.get_mut(next_pos).ant = 0;
+      moved.pop();
+    }
+  } else {
+    let cur_estimate = minimax_min(width, height, 0, moved, enemies, world, attack_radius2, board, tags, tagged, *alpha);
+    if cur_estimate > *alpha {
+      *alpha = cur_estimate;
+      best_moves.clear();
+      for &move in moved.iter() {
+        best_moves.push(move);
+      }
+    }
   }
 }
 
