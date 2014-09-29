@@ -1,4 +1,6 @@
-use std::*;
+extern crate time;
+
+use std::{int, num, cmp};
 use std::collections::*;
 use std::rand::*;
 use point::*;
@@ -12,6 +14,8 @@ static GATHERING_FOOD_PATH_SIZE: uint = 30;
 static ATTACK_ANTHILLS_PATH_SIZE: uint = 10;
 
 static TERRITORY_PATH_SIZE_CONST: uint = 6;
+
+static MINIMAX_TIME: f32 = 0.5;
 
 #[deriving(Clone)]
 struct Tag {
@@ -36,6 +40,7 @@ pub struct Colony {
   pub attack_radius2: uint,
   pub spawn_radius2: uint,
   pub cur_turn: uint,
+  start_time: u64,
   rng: XorShiftRng,
   territory_path_size: uint,
   enemies_count: uint, // Известное количество врагов.
@@ -70,6 +75,7 @@ impl Colony {
       attack_radius2: attack_radius2,
       spawn_radius2: spawn_radius2,
       cur_turn: 0,
+      start_time: get_time(),
       rng: SeedableRng::from_seed([1, ((seed >> 32) & 0xFFFFFFFF) as u32, 3, (seed & 0xFFFFFFFF) as u32]),
       territory_path_size: ((view_radius2 * 2 * TERRITORY_PATH_SIZE_CONST) as f32).sqrt().ceil() as uint,
       enemies_count: 0,
@@ -90,6 +96,14 @@ impl Colony {
       food: DList::new()
     }
   }
+}
+
+fn get_time() -> u64 {
+  time::precise_time_ns() / 1000000
+}
+
+fn elapsed_time(start_time: u64) -> uint {
+  (get_time() - start_time) as uint
 }
 
 fn length(width: uint, height: uint) -> uint {
@@ -1063,6 +1077,7 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
 }
 
 pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
+  colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
   update_world(colony, input);
