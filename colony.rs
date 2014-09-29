@@ -653,7 +653,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     if (*moved)[ant_pos] {
       continue;
     }
-    let goal = simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, path_size, _, prev_general_tag, general_tag| {
+    let goal = simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, _, prev_general_tag, general_tag| {
       let cell = (*world)[pos];
       let prev_general_tag_or_start = prev_general_tag == 1 || pos == ant_pos;
       if cell == Water || prev_general_tag_or_start && ((*moved)[pos] && is_ant(cell, 0) || cell == Food) {
@@ -868,7 +868,7 @@ fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius
 }
 
 fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, groups: &mut Vec<bool>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, group: &mut T, ours: bool) {
-  simple_wave(width, height, tags, tagged, ant_pos, |pos, path_size, prev, _, _| {
+  simple_wave(width, height, tags, tagged, ant_pos, |pos, _, prev, _, _| {
     if !(*groups)[pos] {
       match (*world)[pos] {
         Ant(0) | AnthillWithAnt(0) => {
@@ -1040,7 +1040,6 @@ fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &
       if !escape {
         moves.push(e_pos);
       }
-      escape = true;
     } else {
       moves.push(e_pos);
     }
@@ -1112,7 +1111,6 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let mut ours = Vec::new();
   let mut enemies = Vec::new();
   let mut moved = DList::new();
-  let mut alpha = int::MIN;
   let mut best_moves = Vec::new();
   for &ant_pos in colony.enemies_ants.iter() {
     simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, prev, _, _| {
@@ -1131,7 +1129,7 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     }
     get_group(width, height, pos, attack_radius2, &colony.world, &mut colony.groups, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     if !enemies.is_empty() {
-      alpha = int::MIN;
+      let mut alpha = int::MIN;
       minimax_max(width, height, 0, &mut moved, &ours, &enemies, &colony.world, dangerous_place, attack_radius2, &mut colony.board, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves);
       for i in range(0u, ours.len()) {
         let pos = ours[i];
