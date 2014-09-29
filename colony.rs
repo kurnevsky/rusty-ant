@@ -960,6 +960,9 @@ fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &
   let s_pos = s(width, height, pos);
   let w_pos = w(width, pos);
   let e_pos = e(width, pos);
+  if board[pos].ant == 0 {
+    moves.push(pos);
+  }
   if !is_water_or_food(world[n_pos]) && board[n_pos].ant == 0 {
     moves.push(n_pos);
   }
@@ -1048,8 +1051,12 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
       for i in range(0u, ours.len()) {
         let pos = ours[i];
         let next_pos = best_moves[i];
-        let direction = to_direction(colony.width, colony.height, pos, next_pos);
-        move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, direction);
+        if pos == next_pos {
+          *colony.moved.get_mut(pos) = true;
+        } else {
+          let direction = to_direction(colony.width, colony.height, pos, next_pos);
+          move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, direction);
+        }
       }
     }
   }
