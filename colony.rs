@@ -1123,7 +1123,7 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
         false
       }
     }, |_, _, _| { false });
-    clear_tags(tags, tagged);
+    clear_tags(colony.tags, colony.tagged);
   }
   for &pos in colony.ours_ants.iter() {
     if colony.groups[pos] {
