@@ -919,14 +919,14 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
   let mut enemies_dead_count = 0u;
   for &ant_pos in ants.iter() {
     let ant_board_cell = (*board)[ant_pos];
-    if ant_board_cell.ant < 2 {
+    if ant_board_cell.ant == 0 {
       continue;
     }
     let ant_number = ant_board_cell.ant;
     simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _, _, _| {
       if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
         let board_cell = board.get_mut(pos);
-        if board_cell.ant > 1 && board_cell.ant != ant_number {
+        if board_cell.ant != ant_number {
           board_cell.attack += 1;
         }
         true
@@ -938,11 +938,11 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
   }
   for &ant_pos in ants.iter() {
     let ant_board_cell = (*board)[ant_pos];
-    if ant_board_cell.ant < 2 {
+    if ant_board_cell.ant == 0 {
       continue;
     }
     if is_dead(width, height, ant_pos, attack_radius2, board, tags, tagged) {
-      if ant_board_cell.ant == 2 {
+      if ant_board_cell.ant == 1 {
         ours_dead_count += 1;
       } else {
         enemies_dead_count += 1;
@@ -955,8 +955,23 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
   enemies_dead_count as int - ours_dead_count as int
 }
 
-fn get_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>) {
-  
+fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &Vec<Cell>, board: &Vec<BoardCell>, moves: &mut T) {
+  let n_pos = n(width, height, pos);
+  let s_pos = s(width, height, pos);
+  let w_pos = w(width, pos);
+  let e_pos = e(width, pos);
+  if !is_water_or_food(n_pos) && board[n_pos].ant == 0 {
+    moves.push(n_pos);
+  }
+  if !is_water_or_food(w_pos) && board[w_pos].ant == 0 {
+    moves.push(w_pos);
+  }
+  if !is_water_or_food(s_pos) && board[s_pos].ant == 0 {
+    moves.push(s_pos);
+  }
+  if !is_water_or_food(e_pos) && board[e_pos].ant == 0 {
+    moves.push(e_pos);
+  }
 }
 
 fn minimax_min(width: uint, height: uint, idx: uint, ours_moved: &DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, board: &mut Vec<BoardCell>) {
