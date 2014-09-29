@@ -21,6 +21,12 @@ struct Tag {
   general: uint
 }
 
+#[deriving(Clone)]
+struct BoardCell {
+  ant: uint,
+  attack: uint
+}
+
 pub struct Colony {
   pub width: uint,
   pub height: uint,
@@ -41,12 +47,15 @@ pub struct Colony {
   gathered_food: Vec<uint>, // Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1.
   territory: Vec<uint>,
   groups: Vec<bool>,
+  board: Vec<BoardCell>,
   tags: Vec<Tag>,
   tagged: DList<uint>, // Список позиций start_tags и path_tags с ненулевыми значениями.
   ours_ants: DList<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
   enemies_ants: DList<uint>,
   enemies_anthills: DList<uint>,
   food: DList<uint> // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
+  //danger_place
+  //aggressive_place
 }
 
 impl Colony {
@@ -72,6 +81,7 @@ impl Colony {
       gathered_food: Vec::from_elem(len, 0u),
       territory: Vec::from_elem(len, 0u),
       groups: Vec::from_elem(len, false),
+      board: Vec::from_elem(len, BoardCell { ant: 0, attack: 0 }),
       tags: Vec::from_elem(len, Tag { start: 0, prev: 0, length: 0, general: 0 }),
       tagged: DList::new(),
       ours_ants: DList::new(),
@@ -291,6 +301,13 @@ fn find_path<T: Deque<uint>>(tags: &Vec<Tag>, from: uint, to: uint, path: &mut T
 fn is_free(cell: Cell) -> bool {
   match cell {
     Land | Unknown | Anthill(_) => true,
+    _ => false
+  }
+}
+
+fn is_water_or_food(cell: Cell) -> bool {
+  match cell {
+    Water | Food => true,
     _ => false
   }
 }
@@ -755,14 +772,14 @@ fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius
   let s_pos2 = s(width, height, pos2);
   let w_pos2 = w(width, pos2);
   let e_pos2 = e(width, pos2);
-  let n_pos1_water = world[n_pos1] == Water;
-  let s_pos1_water = world[s_pos1] == Water;
-  let w_pos1_water = world[w_pos1] == Water;
-  let e_pos1_water = world[e_pos1] == Water;
-  let n_pos2_water = world[n_pos2] == Water;
-  let s_pos2_water = world[s_pos2] == Water;
-  let w_pos2_water = world[w_pos2] == Water;
-  let e_pos2_water = world[e_pos2] == Water;
+  let n_pos1_water = is_water_or_food(world[n_pos1]);
+  let s_pos1_water = is_water_or_food(world[s_pos1]);
+  let w_pos1_water = is_water_or_food(world[w_pos1]);
+  let e_pos1_water = is_water_or_food(world[e_pos1]);
+  let n_pos2_water = is_water_or_food(world[n_pos2]);
+  let s_pos2_water = is_water_or_food(world[s_pos2]);
+  let w_pos2_water = is_water_or_food(world[w_pos2]);
+  let e_pos2_water = is_water_or_food(world[e_pos2]);
   if !n_pos1_water {
     let n_distance = euclidean(width, height, n_pos1, pos2);
     if n_distance <= attack_radius2 {
@@ -882,6 +899,82 @@ fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, atta
   }
 }
 
+fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board: &Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>) -> bool {
+  let mut result = false;
+  let attack_value = board[ant_pos].attack;
+  simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _, _, _| { euclidean(width, height, ant_pos, pos) <= attack_radius2 }, |pos, _, _| {
+    if board[pos].attack < attack_value {
+      result = true;
+      true
+    } else {
+      false
+    }
+  });
+  clear_tags(tags, tagged);
+  result
+}
+
+fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>) -> int { //TODO: для оптимизации юзать danger_place.
+  let mut ours_dead_count = 0u;
+  let mut enemies_dead_count = 0u;
+  for &ant_pos in ants.iter() {
+    let ant_board_cell = (*board)[ant_pos];
+    if ant_board_cell.ant < 2 {
+      continue;
+    }
+    let ant_number = ant_board_cell.ant;
+    simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _, _, _| {
+      if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
+        let board_cell = board.get_mut(pos);
+        if board_cell.ant > 1 && board_cell.ant != ant_number {
+          board_cell.attack += 1;
+        }
+        true
+      } else {
+        false
+      }
+    }, |_, _, _| { false });
+    clear_tags(tags, tagged);
+  }
+  for &ant_pos in ants.iter() {
+    let ant_board_cell = (*board)[ant_pos];
+    if ant_board_cell.ant < 2 {
+      continue;
+    }
+    if is_dead(width, height, ant_pos, attack_radius2, board, tags, tagged) {
+      if ant_board_cell.ant == 2 {
+        ours_dead_count += 1;
+      } else {
+        enemies_dead_count += 1;
+      }
+    }
+  }
+  for &ant_pos in ants.iter() {
+    board.get_mut(ant_pos).attack = 0;
+  }
+  enemies_dead_count as int - ours_dead_count as int
+}
+
+fn get_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>) {
+  
+}
+
+fn minimax_min(width: uint, height: uint, idx: uint, ours_moved: &DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, board: &mut Vec<BoardCell>) {
+  if idx < enemies.len() {
+    
+  } else {
+    
+  }
+}
+
+fn minimax_max(width: uint, height: uint, idx: uint, ours: &Vec<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, board: &mut Vec<BoardCell>) {
+  if idx < ours.len() {
+    
+  } else {
+    
+  }
+}
+
 fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let mut ours = Vec::new();
   let mut enemies = Vec::new();
@@ -890,7 +983,9 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
       continue;
     }
     get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &mut colony.groups, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
-    //TODO
+    if !enemies.is_empty() {
+      //TODO
+    }
   }
 }
 
