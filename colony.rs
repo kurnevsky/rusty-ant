@@ -1,6 +1,6 @@
 extern crate time;
 
-use std::{int, num, cmp};
+use std::{int, num, cmp, io};
 use std::collections::*;
 use std::rand::*;
 use point::*;
@@ -872,13 +872,13 @@ fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint,
     if !(*groups)[pos] {
       match (*world)[pos] {
         Ant(0) | AnthillWithAnt(0) => {
-          if ours && in_one_group(width, height, ant_pos, pos, attack_radius2, world) {
+          if ours && !(*groups)[pos] && in_one_group(width, height, ant_pos, pos, attack_radius2, world) {
             group.push(pos);
             *groups.get_mut(pos) = true;
           }
         },
         Ant(_) | AnthillWithAnt(_) => {
-          if !ours && in_one_group(width, height, ant_pos, pos, attack_radius2, world) {
+          if !ours && !(*groups)[pos] && in_one_group(width, height, ant_pos, pos, attack_radius2, world) {
             group.push(pos);
             *groups.get_mut(pos) = true;
           }
@@ -901,6 +901,7 @@ fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, atta
   let mut ours_q = DList::new();
   let mut enemies_q = DList::new();
   ours_q.push(ant_pos);
+  *groups.get_mut(ant_pos) = true;
   while !ours_q.is_empty() || !enemies_q.is_empty() {
     if !ours_q.is_empty() {
       let pos = ours_q.pop_front().unwrap();
@@ -999,49 +1000,65 @@ fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &
   let w_pos = w(width, pos);
   let e_pos = e(width, pos);
   let mut escape = false;
+  
+  let point = from_pos(width, pos);
+  io::stderr().write_uint(point.y).ok();
+  io::stderr().write_str(":").ok();
+  io::stderr().write_uint(point.x).ok();
+  io::stderr().write_line("").ok();
+  
   if board[pos].ant == 0 {
     moves.push(pos);
     if !danger_place[pos] {
       escape = true;
     }
+    io::stderr().write_line("o").ok();
   }
   if !is_water_or_food(world[n_pos]) && board[n_pos].ant == 0 {
     if !danger_place[n_pos] {
       if !escape {
         moves.push(n_pos);
+        io::stderr().write_line("n1").ok();
       }
       escape = true;
     } else {
       moves.push(n_pos);
+      io::stderr().write_line("n2").ok();
     }
   }
   if !is_water_or_food(world[w_pos]) && board[w_pos].ant == 0 {
     if !danger_place[w_pos] {
       if !escape {
         moves.push(w_pos);
+        io::stderr().write_line("w1").ok();
       }
       escape = true;
     } else {
       moves.push(w_pos);
+      io::stderr().write_line("w2").ok();
     }
   }
   if !is_water_or_food(world[s_pos]) && board[s_pos].ant == 0 {
     if !danger_place[s_pos] {
       if !escape {
         moves.push(s_pos);
+        io::stderr().write_line("s1").ok();
       }
       escape = true;
     } else {
       moves.push(s_pos);
+      io::stderr().write_line("s2").ok();
     }
   }
   if !is_water_or_food(world[e_pos]) && board[e_pos].ant == 0 {
     if !danger_place[e_pos] {
       if !escape {
         moves.push(e_pos);
+        io::stderr().write_line("e1").ok();
       }
     } else {
       moves.push(e_pos);
+      io::stderr().write_line("e2").ok();
     }
   }
 }
