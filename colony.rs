@@ -881,7 +881,7 @@ fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius
 
 fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, group: &mut T, ours: bool) {
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, prev, _, _| {
-    if (*groups)[pos] != 0 && !moved[pos] {
+    if (*groups)[pos] == 0 && !moved[pos] {
       match (*world)[pos] {
         Ant(0) | AnthillWithAnt(0) => {
           if ours && in_one_group(width, height, ant_pos, pos, attack_radius2, world) {
@@ -1173,6 +1173,15 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     if !enemies.is_empty() {
       let mut alpha = int::MIN;
       minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, &colony.dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves);
+      
+      let point = from_pos(colony.width, pos);
+      io::stderr().write_uint(point.y).ok();
+      io::stderr().write_str(":").ok();
+      io::stderr().write_uint(point.x).ok();
+      io::stderr().write_line("").ok();
+      io::stderr().write_int(alpha).ok();
+      io::stderr().write_line("").ok();
+      
       for i in range(0u, ours.len()) {
         let pos = ours[i];
         let next_pos = best_moves[i];
