@@ -134,15 +134,17 @@ fn from_pos(width: uint, pos: uint) -> Point {
   }
 }
 
-fn to_direction(width: uint, height: uint, pos1: uint, pos2: uint) -> Direction {
+fn to_direction(width: uint, height: uint, pos1: uint, pos2: uint) -> Option<Direction> {
   if n(width, height, pos1) == pos2 {
-    North
+    Some(North)
   } else if s(width, height, pos1) == pos2 {
-    South
+    Some(South)
   } else if w(width, pos1) == pos2 {
-    West
+    Some(West)
+  } else if e(width, pos1) == pos2 {
+    Some(East)
   } else {
-    East
+    None
   }
 }
 
@@ -346,7 +348,7 @@ fn is_water_or_food(cell: Cell) -> bool {
   }
 }*/
 
-fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec<Cell>, visible_area: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ant_pos: uint) -> Option<Direction> {
+fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec<Cell>, visible_area: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ant_pos: uint) -> Option<uint> {
   let mut n_score = 0u;
   let mut s_score = 0u;
   let mut w_score = 0u;
@@ -449,45 +451,40 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
   if n_score == 0 && s_score == 0 && w_score == 0 && e_score == 0 {
     None
   } else if n_score >= s_score && n_score >= w_score && n_score >= e_score {
-    Some(North)
+    Some(n_pos)
   } else if s_score >= n_score && s_score >= w_score && s_score >= e_score {
-    Some(South)
+    Some(s_pos)
   } else if w_score >= e_score && w_score >= n_score && w_score >= s_score {
-    Some(West)
+    Some(w_pos)
   } else {
-    Some(East)
+    Some(e_pos)
   }
 }
 
-fn move<T: MutableSeq<Move>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, pos: uint, direction: Direction) {
+fn move<T: MutableSeq<Move>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, pos: uint, next_pos: uint) {
   *world.get_mut(pos) = match (*world)[pos] {
     AnthillWithAnt(0) => Anthill(0),
     _ => Land
   };
   *moved.get_mut(pos) = true;
-  match direction {
-    North => {
-      let n_pos = n(width, height, pos);
-      *world.get_mut(n_pos) = if (*world)[n_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
-      *moved.get_mut(n_pos) = true;
-    },
-    West => {
-      let w_pos = w(width, pos);
-      *world.get_mut(w_pos) = if (*world)[w_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
-      *moved.get_mut(w_pos) = true;
-    },
-    South => {
-      let s_pos = s(width, height, pos);
-      *world.get_mut(s_pos) = if (*world)[s_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
-      *moved.get_mut(s_pos) = true;
-    },
-    East => {
-      let e_pos = e(width, pos);
-      *world.get_mut(e_pos) = if (*world)[e_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
-      *moved.get_mut(e_pos) = true;
-    }
+  *world.get_mut(next_pos) = if (*world)[next_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
+  *moved.get_mut(next_pos) = true;
+  output.push(Move { point: from_pos(width, pos), direction: to_direction(width, height, pos, next_pos).unwrap() })
+}
+
+fn move_all<T: MutableSeq<Move>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, moves: &DList<(uint, uint)>) {
+  for &(pos, _) in moves.iter() {
+    *world.get_mut(pos) = match (*world)[pos] {
+      AnthillWithAnt(0) => Anthill(0),
+      _ => Land
+    };
+    *moved.get_mut(pos) = true;
   }
-  output.push(Move { point: from_pos(width, pos), direction: direction })
+  for &(pos, next_pos) in moves.iter() {
+    *world.get_mut(next_pos) = if (*world)[next_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
+    *moved.get_mut(next_pos) = true;
+    output.push(Move { point: from_pos(width, pos), direction: to_direction(width, height, pos, next_pos).unwrap() });
+  }
 }
 
 fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) {
@@ -622,7 +619,7 @@ fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) { //TODO: 
       continue;
     }
     match discover_direction(colony.width, colony.height, colony.view_radius2, &colony.world, &colony.visible_area, &mut colony.tags, &mut colony.tagged, pos) {
-      Some(d) => move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, d),
+      Some(next_pos) => move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, next_pos),
       None => { }
     }
   }
@@ -692,8 +689,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     while moves.len() > 1 {
       let next_ant_pos = moves.pop().unwrap();
       let pos = *moves.back().unwrap();
-      let direction = to_direction(width, height, pos, next_ant_pos);
-      move(width, height, world, moved, output, pos, direction);
+      move(width, height, world, moved, output, pos, next_ant_pos);
     }
   }
 }
@@ -709,8 +705,7 @@ fn attack_anthills<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
         if pos != start_pos && !is_free((*world)[prev]) {
           false
         } else {
-          let direction = to_direction(width, height, pos, prev);
-          move(width, height, world, moved, output, pos, direction);
+          move(width, height, world, moved, output, pos, prev);
           true
         }
       },
@@ -758,8 +753,7 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
         if pos != start_pos && !is_free((*world)[prev]) {
           false
         } else {
-          let direction = to_direction(width, height, pos, prev);
-          move(width, height, world, moved, output, pos, direction);
+          move(width, height, world, moved, output, pos, prev);
           *gathered_food.get_mut(start_pos) = pos + 1;
           true
         }
@@ -1173,25 +1167,17 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     if !enemies.is_empty() {
       let mut alpha = int::MIN;
       minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, &colony.dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves);
-      
-      let point = from_pos(colony.width, pos);
-      io::stderr().write_uint(point.y).ok();
-      io::stderr().write_str(":").ok();
-      io::stderr().write_uint(point.x).ok();
-      io::stderr().write_line("").ok();
-      io::stderr().write_int(alpha).ok();
-      io::stderr().write_line("").ok();
-      
+      let mut moves = DList::new();
       for i in range(0u, ours.len()) {
         let pos = ours[i];
         let next_pos = best_moves[i];
         if pos == next_pos {
           *colony.moved.get_mut(pos) = true;
         } else {
-          let direction = to_direction(colony.width, colony.height, pos, next_pos);
-          move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, direction);
+          moves.push((pos, next_pos));
         }
       }
+      move_all(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, &moves);
     }
   }
 }
