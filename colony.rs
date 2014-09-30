@@ -3,7 +3,7 @@
 
 extern crate time;
 
-use std::{int, num, cmp, io};
+use std::{int, num, cmp};
 use std::collections::*;
 use std::rand::*;
 use point::*;
@@ -20,9 +20,9 @@ static TERRITORY_PATH_SIZE_CONST: uint = 6;
 
 static MINIMAX_TIME: f32 = 0.5;
 
-static ENEMIES_DEAD_ESTIMATION_CONST: uint = 2;
+static ENEMIES_DEAD_ESTIMATION_CONST: uint = 4;
 
-static OURS_DEAD_ESTIMATION_CONST: uint = 3;
+static OURS_DEAD_ESTIMATION_CONST: uint = 5;
 
 static STANDING_ANTS_CONST: uint = 4;
 
@@ -925,8 +925,10 @@ fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, atta
 fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board: &Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>) -> bool {
   let mut result = false;
   let attack_value = board[ant_pos].attack;
+  let ant_number = board[ant_pos].ant;
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _, _, _| { euclidean(width, height, ant_pos, pos) <= attack_radius2 }, |pos, _, _| {
-    if board[pos].attack < attack_value {
+    let board_cell = board[pos];
+    if board_cell.ant != 0 && board_cell.ant != ant_number && board_cell.attack <= attack_value {
       result = true;
       true
     } else {
@@ -990,16 +992,9 @@ fn get_chain_begin(mut pos: uint, board: &Vec<BoardCell>) -> uint {
 }
 
 fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &Vec<Cell>, groups: &Vec<uint>, dangerous_place: &Vec<bool>, board: &Vec<BoardCell>, standing_ants: &Vec<uint>, moves: &mut T) {
-//let point = from_pos(width, pos);
-//io::stderr().write_str("Moves for: ").ok();
-//io::stderr().write_uint(point.y).ok();
-//io::stderr().write_str(":").ok();
-//io::stderr().write_uint(point.x).ok();
-//io::stderr().write_line("").ok();
   let mut escape = false;
   if board[pos].ant == 0 {
     moves.push(pos);
-//io::stderr().write_line("o").ok();
     if !dangerous_place[pos] {
       escape = true;
     }
@@ -1018,12 +1013,10 @@ fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &
     if !dangerous_place[n_pos] {
       if !escape {
         moves.push(n_pos);
-//io::stderr().write_line("n1").ok();
       }
       escape = true;
     } else {
       moves.push(n_pos);
-//io::stderr().write_line("n1").ok();
     }
   }
   let w_cell = world[w_pos];
@@ -1031,12 +1024,10 @@ fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &
     if !dangerous_place[w_pos] {
       if !escape {
         moves.push(w_pos);
-//io::stderr().write_line("w1").ok();
       }
       escape = true;
     } else {
       moves.push(w_pos);
-//io::stderr().write_line("w2").ok();
     }
   }
   let s_cell = world[s_pos];
@@ -1044,12 +1035,10 @@ fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &
     if !dangerous_place[s_pos] {
       if !escape {
         moves.push(s_pos);
-//io::stderr().write_line("s1").ok();
       }
       escape = true;
     } else {
       moves.push(s_pos);
-//io::stderr().write_line("s2").ok();
     }
   }
   let e_cell = world[e_pos];
@@ -1057,11 +1046,9 @@ fn get_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &
     if !dangerous_place[e_pos] {
       if !escape {
         moves.push(e_pos);
-//io::stderr().write_line("e1").ok();
       }
     } else {
       moves.push(e_pos);
-//io::stderr().write_line("e2").ok();
     }
   }
 }
@@ -1088,7 +1075,7 @@ fn minimax_min(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, en
       board.get_mut(next_pos).ant = 0;
       board.get_mut(next_pos).cycle = 0;
       moved.pop();
-      if cur_estimate <= min_estimate {
+      if cur_estimate < min_estimate {
         min_estimate = cur_estimate;
         if cur_estimate <= alpha {
           break;
@@ -1168,9 +1155,6 @@ fn calculate_dangerous_place(colony: &mut Colony) {
 }
 
 fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
-io::stderr().write_str("Turn: ").ok();
-io::stderr().write_uint(colony.cur_turn).ok();
-io::stderr().write_line("").ok();
   let mut ours = Vec::new();
   let mut enemies = Vec::new();
   let mut moved = DList::new();
@@ -1183,32 +1167,8 @@ io::stderr().write_line("").ok();
     get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
     if !enemies.is_empty() {
-io::stderr().write_str("Group: ").ok();
-io::stderr().write_uint(group_index - 1).ok();
-io::stderr().write_line("").ok();
-io::stderr().write_str("Ours: ").ok();
-for &pos in ours.iter() {
-  let point = from_pos(colony.width, pos);
-  io::stderr().write_uint(point.y).ok();
-  io::stderr().write_str(":").ok();
-  io::stderr().write_uint(point.x).ok();
-  io::stderr().write_str(" ").ok();
-}
-io::stderr().write_line("").ok();
-io::stderr().write_str("Enemies: ").ok();
-for &pos in enemies.iter() {
-  let point = from_pos(colony.width, pos);
-  io::stderr().write_uint(point.y).ok();
-  io::stderr().write_str(":").ok();
-  io::stderr().write_uint(point.x).ok();
-  io::stderr().write_str(" ").ok();
-}
-io::stderr().write_line("").ok();
       let mut alpha = int::MIN;
       minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, &colony.dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves);
-io::stderr().write_str("Estimate: ").ok();
-io::stderr().write_int(alpha).ok();
-io::stderr().write_line("").ok();
       let mut moves = DList::new();
       for i in range(0u, ours.len()) {
         let pos = ours[i];
