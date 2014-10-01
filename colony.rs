@@ -1319,6 +1319,7 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let mut moved = DList::new();
   let mut best_moves = Vec::new();
   let mut group_index = 1;
+  let dangerous_place = &colony.dangerous_place;
   for &pos in colony.ours_ants.iter() {
     if colony.groups[pos] != 0 {
       continue;
@@ -1334,7 +1335,8 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
           break;
         }
       }
-      minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, &colony.dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves, aggressive);
+      ours.sort_by(|&pos1, &pos2| if dangerous_place[pos1] && !dangerous_place[pos2] { Less } else { Equal });
+      minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves, aggressive);
       let mut moves = DList::new();
       for i in range(0u, ours.len()) {
         let pos = ours[i];
