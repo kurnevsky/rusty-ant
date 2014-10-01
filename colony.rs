@@ -5,7 +5,7 @@
 
 extern crate time;
 
-use std::{int, uint, num, cmp};
+use std::{int, uint, num, cmp, io};
 use std::collections::*;
 use std::rand::*;
 use point::*;
@@ -393,7 +393,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
   let e_pos = e(width, ant_pos);
   if is_free(world[n_pos]) {
     simple_wave(width, height, tags, tagged, n_pos, |pos, path_size, prev, _, _| {
-      if pos == s(width, height, prev) || path_size > manhattan(width, height, n_pos, pos) || euclidean(width, height, n_pos, pos) > view_radius2 || world[pos] == Water {
+      if pos == s(width, height, prev) || path_size > manhattan(width, height, n_pos, pos) || euclidean(width, height, n_pos, prev) > view_radius2 || world[pos] == Water {
         false
       } else {
         if euclidean(width, height, ant_pos, pos) > view_radius2 {
@@ -406,7 +406,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
   }
   if is_free(world[s_pos]) {
     simple_wave(width, height, tags, tagged, s_pos, |pos, path_size, prev, _, _| {
-      if pos == n(width, height, prev) || path_size > manhattan(width, height, s_pos, pos) || euclidean(width, height, s_pos, pos) > view_radius2 || world[pos] == Water {
+      if pos == n(width, height, prev) || path_size > manhattan(width, height, s_pos, pos) || euclidean(width, height, s_pos, prev) > view_radius2 || world[pos] == Water {
         false
       } else {
         if euclidean(width, height, ant_pos, pos) > view_radius2 {
@@ -419,7 +419,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
   }
   if is_free(world[w_pos]) {
     simple_wave(width, height, tags, tagged, w_pos, |pos, path_size, prev, _, _| {
-      if pos == e(width, prev) || path_size > manhattan(width, height, w_pos, pos) || euclidean(width, height, w_pos, pos) > view_radius2 || world[pos] == Water {
+      if pos == e(width, prev) || path_size > manhattan(width, height, w_pos, pos) || euclidean(width, height, w_pos, prev) > view_radius2 || world[pos] == Water {
         false
       } else {
         if euclidean(width, height, ant_pos, pos) > view_radius2 {
@@ -432,7 +432,7 @@ fn discover_direction(width: uint, height: uint, view_radius2: uint, world: &Vec
   }
   if is_free(world[e_pos]) {
     simple_wave(width, height, tags, tagged, e_pos, |pos, path_size, prev, _, _| {
-      if pos == w(width, prev) || path_size > manhattan(width, height, e_pos, pos) || euclidean(width, height, e_pos, pos) > view_radius2 || world[pos] == Water {
+      if pos == w(width, prev) || path_size > manhattan(width, height, e_pos, pos) || euclidean(width, height, e_pos, prev) > view_radius2 || world[pos] == Water {
         false
       } else {
         if euclidean(width, height, ant_pos, pos) > view_radius2 {
@@ -1314,6 +1314,9 @@ fn calculate_dangerous_place(colony: &mut Colony) {
 }
 
 fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+io::stderr().write_str("Turn: ").ok();
+io::stderr().write_uint(colony.cur_turn).ok();
+io::stderr().write_line("").ok();
   let mut ours = Vec::new();
   let mut enemies = Vec::new();
   let mut moved = DList::new();
@@ -1326,6 +1329,27 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
     if !enemies.is_empty() {
+io::stderr().write_str("Group: ").ok();
+io::stderr().write_uint(group_index - 1).ok();
+io::stderr().write_line("").ok();
+io::stderr().write_str("Ours: ").ok();
+for &pos in ours.iter() {
+  let point = from_pos(colony.width, pos);
+  io::stderr().write_uint(point.y).ok();
+  io::stderr().write_str(":").ok();
+  io::stderr().write_uint(point.x).ok();
+  io::stderr().write_str(" ").ok();
+}
+io::stderr().write_line("").ok();
+io::stderr().write_str("Enemies: ").ok();
+for &pos in enemies.iter() {
+  let point = from_pos(colony.width, pos);
+  io::stderr().write_uint(point.y).ok();
+  io::stderr().write_str(":").ok();
+  io::stderr().write_uint(point.x).ok();
+  io::stderr().write_str(" ").ok();
+}
+io::stderr().write_line("").ok();
       let mut alpha = int::MIN;
       let mut aggressive = false;
       for &pos in ours.iter() {
@@ -1334,7 +1358,13 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
           break;
         }
       }
+io::stderr().write_str("Aggressive: ").ok();
+io::stderr().write_uint(aggressive as uint).ok();
+io::stderr().write_line("").ok();
       minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, &colony.dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves, aggressive);
+io::stderr().write_str("Estimate: ").ok();
+io::stderr().write_int(alpha).ok();
+io::stderr().write_line("").ok();
       let mut moves = DList::new();
       for i in range(0u, ours.len()) {
         let pos = ours[i];
