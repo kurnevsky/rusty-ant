@@ -1328,7 +1328,7 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     if !enemies.is_empty() {
       let mut alpha = int::MIN;
       let mut aggressive = false;
-      for &pos in enemies.iter() {
+      for &pos in ours.iter() {
         if colony.aggressive_place[pos] {
           aggressive = true;
           break;
