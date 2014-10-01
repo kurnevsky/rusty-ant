@@ -583,12 +583,11 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   }
   for &ant_pos in colony.ours_ants.iter() {
     simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, _, _, _| {
-      let distance = euclidean(width, height, pos, ant_pos);
-      if distance > view_radius2 {
-        false
-      } else {
+      if euclidean(width, height, pos, ant_pos) <= view_radius2 {
         *visible_area.get_mut(pos) = 0;
         true
+      } else {
+        false
       }
     }, |_, _, _| { false });
     clear_tags(&mut colony.tags, &mut colony.tagged);
@@ -653,12 +652,27 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
 }
 
 fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) { //TODO: сделать так, чтобы рядомстоящие муравьи не исследовали одну и ту же область.
+  let width = colony.width;
+  let height = colony.height;
+  let view_radius2 = colony.view_radius2;
+  let visible_area = &mut colony.visible_area;
   for &pos in colony.ours_ants.iter() {
     if colony.moved[pos] {
       continue;
     }
-    match discover_direction(colony.width, colony.height, colony.view_radius2, &colony.world, &colony.visible_area, &mut colony.tags, &mut colony.tagged, pos) {
-      Some(next_pos) => move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, next_pos),
+    match discover_direction(width, height, view_radius2, &colony.world, visible_area, &mut colony.tags, &mut colony.tagged, pos) {
+      Some(next_pos) => {
+        simple_wave(width, height, &mut colony.tags, &mut colony.tagged, next_pos, |pos, _, _, _, _| {
+          if euclidean(width, height, pos, next_pos) <= view_radius2 {
+            *visible_area.get_mut(pos) = 0;
+            true
+          } else {
+            false
+          }
+        }, |_, _, _| { false });
+        clear_tags(&mut colony.tags, &mut colony.tagged);
+        move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, next_pos);
+      },
       None => { }
     }
   }
