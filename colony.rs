@@ -1089,11 +1089,11 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
   let enemy_food_estimation_const = if aggressive { ENEMY_FOOD_AGGRESSIVE_ESTIMATION_CONST } else { ENEMY_FOOD_ESTIMATION_CONST };
   let destroyed_enemy_anthill_estimation_const = if aggressive { DESTROYED_ENEMY_ANTHILL_AGGRESSIVE_ESTIMATION_CONST } else { DESTROYED_ENEMY_ANTHILL_ESTIMATION_CONST };
   let destroyed_our_anthill_estimation_const = if aggressive { DESTROYED_OUR_ANTHILL_AGGRESSIVE_ESTIMATION_CONST } else { DESTROYED_OUR_ANTHILL_ESTIMATION_CONST };
-  let distance_to_enemies_estimation_conts = if aggressive { DISTANCE_TO_ENEMIES_AGGRESSIVE_ESTIMATION_CONST } else { DISTANCE_TO_ENEMIES_ESTIMATION_CONST };
+  let distance_to_enemies_estimation_const = if aggressive { DISTANCE_TO_ENEMIES_AGGRESSIVE_ESTIMATION_CONST } else { DISTANCE_TO_ENEMIES_ESTIMATION_CONST };
   (enemies_dead_count * enemies_dead_estimation_conts) as int - (ours_dead_count * ours_dead_estimation_conts) as int +
   (our_food * our_food_estimation_const) as int - (enemy_food * enemy_food_estimation_const) as int +
   (destroyed_enemy_anthills * destroyed_enemy_anthill_estimation_const) as int - (destroyed_our_anthills * destroyed_our_anthill_estimation_const) as int -
-  (distance_to_enemies * distance_to_enemies_estimation_conts) as int
+  (distance_to_enemies * distance_to_enemies_estimation_const) as int
 }
 
 fn get_chain_begin(mut pos: uint, board: &Vec<BoardCell>) -> uint {
