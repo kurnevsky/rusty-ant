@@ -5,7 +5,7 @@
 
 extern crate time;
 
-use std::{int, uint, num, cmp, io};
+use std::{int, uint, num, cmp};
 use std::collections::*;
 use std::rand::*;
 use point::*;
@@ -1055,13 +1055,6 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
         if is_enemy_anthill(world[ant_pos]) {
           destroyed_enemy_anthills += 1;
         }
-      } else {
-        if is_near_food(width, height, world, ant_pos) {
-          enemy_food += 1;
-        }
-        if is_our_anthill(world[ant_pos]) {
-          destroyed_our_anthills += 1;
-        }
         let mut min_distance_to_enemy = uint::MAX;
         for &enemy_pos in ants.iter() {
           let enemy_board_cell = (*board)[enemy_pos];
@@ -1075,6 +1068,13 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
         }
         if min_distance_to_enemy != uint::MAX {
           distance_to_enemies += min_distance_to_enemy;
+        }
+      } else {
+        if is_near_food(width, height, world, ant_pos) {
+          enemy_food += 1;
+        }
+        if is_our_anthill(world[ant_pos]) {
+          destroyed_our_anthills += 1;
         }
       }
     }
@@ -1314,9 +1314,6 @@ fn calculate_dangerous_place(colony: &mut Colony) {
 }
 
 fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
-io::stderr().write_str("Turn: ").ok();
-io::stderr().write_uint(colony.cur_turn).ok();
-io::stderr().write_line("").ok();
   let mut ours = Vec::new();
   let mut enemies = Vec::new();
   let mut moved = DList::new();
@@ -1329,27 +1326,6 @@ io::stderr().write_line("").ok();
     get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
     if !enemies.is_empty() {
-io::stderr().write_str("Group: ").ok();
-io::stderr().write_uint(group_index - 1).ok();
-io::stderr().write_line("").ok();
-io::stderr().write_str("Ours: ").ok();
-for &pos in ours.iter() {
-  let point = from_pos(colony.width, pos);
-  io::stderr().write_uint(point.y).ok();
-  io::stderr().write_str(":").ok();
-  io::stderr().write_uint(point.x).ok();
-  io::stderr().write_str(" ").ok();
-}
-io::stderr().write_line("").ok();
-io::stderr().write_str("Enemies: ").ok();
-for &pos in enemies.iter() {
-  let point = from_pos(colony.width, pos);
-  io::stderr().write_uint(point.y).ok();
-  io::stderr().write_str(":").ok();
-  io::stderr().write_uint(point.x).ok();
-  io::stderr().write_str(" ").ok();
-}
-io::stderr().write_line("").ok();
       let mut alpha = int::MIN;
       let mut aggressive = false;
       for &pos in ours.iter() {
@@ -1358,13 +1334,7 @@ io::stderr().write_line("").ok();
           break;
         }
       }
-io::stderr().write_str("Aggressive: ").ok();
-io::stderr().write_uint(aggressive as uint).ok();
-io::stderr().write_line("").ok();
       minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, &colony.dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves, aggressive);
-io::stderr().write_str("Estimate: ").ok();
-io::stderr().write_int(alpha).ok();
-io::stderr().write_line("").ok();
       let mut moves = DList::new();
       for i in range(0u, ours.len()) {
         let pos = ours[i];
