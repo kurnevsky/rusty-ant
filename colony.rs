@@ -1,9 +1,11 @@
-//TODO: учет еды, муравейников, расстояния до вражеских муравьев в функции оценки.
+//TODO: учет времени.
 //TODO: убегание, если в группе один свой муравей.
+//TODO: защита муравейников.
+//TODO: аггрессивность, если игра долго идет, а противник известен только один.
 
 extern crate time;
 
-use std::{int, num, cmp};
+use std::{int, uint, num, cmp};
 use std::collections::*;
 use std::rand::*;
 use point::*;
@@ -20,11 +22,39 @@ static TERRITORY_PATH_SIZE_CONST: uint = 6;
 
 static MINIMAX_TIME: f32 = 0.5;
 
-static ENEMIES_DEAD_ESTIMATION_CONST: uint = 4;
+static ENEMIES_DEAD_ESTIMATION_CONST: uint = 4000;
 
-static OURS_DEAD_ESTIMATION_CONST: uint = 5;
+static OURS_DEAD_ESTIMATION_CONST: uint = 5000;
+
+static OUR_FOOD_ESTIMATION_CONST: uint = 2000;
+
+static ENEMY_FOOD_ESTIMATION_CONST: uint = 1000;
+
+static DESTROYED_ENEMY_ANTHILL_ESTIMATION_CONST: uint = 30000;
+
+static DESTROYED_OUR_ANTHILL_ESTIMATION_CONST: uint = 30000;
+
+static DISTANCE_TO_ENEMIES_ESTIMATION_CONST: uint = 1;
+
+static ENEMIES_DEAD_AGGRESSIVE_ESTIMATION_CONST: uint = 5000;
+
+static OURS_DEAD_AGGRESSIVE_ESTIMATION_CONST: uint = 3000;
+
+static OUR_FOOD_AGGRESSIVE_ESTIMATION_CONST: uint = 2000;
+
+static ENEMY_FOOD_AGGRESSIVE_ESTIMATION_CONST: uint = 1000;
+
+static DESTROYED_ENEMY_ANTHILL_AGGRESSIVE_ESTIMATION_CONST: uint = 30000;
+
+static DESTROYED_OUR_ANTHILL_AGGRESSIVE_ESTIMATION_CONST: uint = 30000;
+
+static DISTANCE_TO_ENEMIES_AGGRESSIVE_ESTIMATION_CONST: uint = 1;
 
 static STANDING_ANTS_CONST: uint = 4;
+
+static NEIGHBORS_FOR_AGGRESSIVE: uint = 4;
+
+static OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: uint = 4;
 
 #[deriving(Clone)]
 struct Tag {
@@ -38,7 +68,8 @@ struct Tag {
 struct BoardCell {
   ant: uint,
   attack: uint,
-  cycle: uint
+  cycle: uint,
+  dead: bool
 }
 
 pub struct Colony {
@@ -63,6 +94,7 @@ pub struct Colony {
   territory: Vec<uint>,
   dangerous_place: Vec<bool>,
   dangerous_place_for_enemies: Vec<bool>,
+  aggressive_place: Vec<bool>,
   groups: Vec<uint>,
   board: Vec<BoardCell>,
   tags: Vec<Tag>,
@@ -70,8 +102,8 @@ pub struct Colony {
   ours_ants: DList<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
   enemies_ants: DList<uint>,
   enemies_anthills: DList<uint>,
+  ours_anthills: DList<uint>,
   food: DList<uint> // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
-  //aggressive_place
 }
 
 impl Colony {
@@ -99,13 +131,15 @@ impl Colony {
       territory: Vec::from_elem(len, 0u),
       dangerous_place: Vec::from_elem(len, false),
       dangerous_place_for_enemies: Vec::from_elem(len, false),
+      aggressive_place: Vec::from_elem(len, false),
       groups: Vec::from_elem(len, 0u),
-      board: Vec::from_elem(len, BoardCell { ant: 0, attack: 0, cycle: 0 }),
+      board: Vec::from_elem(len, BoardCell { ant: 0, attack: 0, cycle: 0, dead: false }),
       tags: Vec::from_elem(len, Tag { start: 0, prev: 0, length: 0, general: 0 }),
       tagged: DList::new(),
       ours_ants: DList::new(),
       enemies_ants: DList::new(),
       enemies_anthills: DList::new(),
+      ours_anthills: DList::new(),
       food: DList::new()
     }
   }
@@ -502,10 +536,12 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
     *colony.territory.get_mut(pos) = 0;
     *colony.groups.get_mut(pos) = 0;
     *colony.dangerous_place.get_mut(pos) = false;
+    *colony.aggressive_place.get_mut(pos) = false;
   }
   colony.ours_ants.clear();
   colony.enemies_ants.clear();
   colony.enemies_anthills.clear();
+  colony.ours_anthills.clear();
   colony.food.clear();
   for &i in *input {
     match i {
@@ -521,7 +557,9 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
       InputAnthill(point, player) => {
         let pos = to_pos(width, point);
         *colony.world.get_mut(pos) = if colony.world[pos] == Ant(player) { AnthillWithAnt(player) } else { Anthill(player) };
-        if player != 0 {
+        if player == 0 {
+          colony.ours_anthills.push(pos);
+        } else {
           colony.enemies_anthills.push(pos);
           if player > colony.enemies_count {
             colony.enemies_count = player;
@@ -574,8 +612,8 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
         }
       }
       match colony.world[pos] {
-        Ant(player) if player > 1 => *colony.standing_ants.get_mut(pos) += 1,
-        AnthillWithAnt(player) if player > 1 => *colony.standing_ants.get_mut(pos) += 1,
+        Ant(player) if player > 0 => *colony.standing_ants.get_mut(pos) += 1,
+        AnthillWithAnt(player) if player > 0 => *colony.standing_ants.get_mut(pos) += 1,
         _ => *colony.standing_ants.get_mut(pos) = 0
       }
     } else {
@@ -592,6 +630,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
         Unknown => Unknown,
         Ant(0) | AnthillWithAnt(0) => Land,
         Anthill(0) => {
+          colony.ours_anthills.push(pos);
           Anthill(0)
         },
         Ant(player) => {
@@ -939,9 +978,37 @@ fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board
   result
 }
 
-fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>) -> int { //TODO: для оптимизации юзать danger_place.
+fn is_near_food(width: uint, height: uint, world: &Vec<Cell>, pos: uint) -> bool {
+  if world[n(width, height, pos)] == Food ||
+     world[s(width, height, pos)] == Food ||
+     world[w(width, pos)] == Food ||
+     world[e(width, pos)] == Food {
+    true
+  } else {
+    false
+  }
+}
+
+fn is_enemy_anthill(cell: Cell) -> bool {
+  match cell {
+    Anthill(player) if player > 0 => true,
+    AnthillWithAnt(player) if player > 0 => true,
+    _ => false
+  }
+}
+
+fn is_our_anthill(cell: Cell) -> bool {
+  cell == Anthill(0) || cell == AnthillWithAnt(0)
+}
+
+fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, aggressive: bool) -> int { //TODO: для оптимизации юзать danger_place.
   let mut ours_dead_count = 0u;
   let mut enemies_dead_count = 0u;
+  let mut our_food = 0u;
+  let mut enemy_food = 0u;
+  let mut destroyed_enemy_anthills = 0u;
+  let mut destroyed_our_anthills = 0u;
+  let mut distance_to_enemies = 0u;
   for &ant_pos in ants.iter() {
     let ant_board_cell = (*board)[ant_pos];
     if ant_board_cell.ant == 0 {
@@ -962,22 +1029,71 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
     clear_tags(tags, tagged);
   }
   for &ant_pos in ants.iter() {
+    if (*board)[ant_pos].ant == 0 {
+      continue;
+    }
+    if is_dead(width, height, ant_pos, attack_radius2, board, tags, tagged) {
+      board.get_mut(ant_pos).dead = true;
+    }
+  }
+  for &ant_pos in ants.iter() {
     let ant_board_cell = (*board)[ant_pos];
     if ant_board_cell.ant == 0 {
       continue;
     }
-    if is_dead(width, height, ant_pos, attack_radius2, board, tags, tagged) {
+    if ant_board_cell.dead {
       if ant_board_cell.ant == 1 {
         ours_dead_count += 1;
       } else {
         enemies_dead_count += 1;
       }
+    } else {
+      if ant_board_cell.ant == 1 {
+        if is_near_food(width, height, world, ant_pos) {
+          our_food += 1;
+        }
+        if is_enemy_anthill(world[ant_pos]) {
+          destroyed_enemy_anthills += 1;
+        }
+      } else {
+        if is_near_food(width, height, world, ant_pos) {
+          enemy_food += 1;
+        }
+        if is_our_anthill(world[ant_pos]) {
+          destroyed_our_anthills += 1;
+        }
+        let mut min_distance_to_enemy = uint::MAX;
+        for &enemy_pos in ants.iter() {
+          let enemy_board_cell = (*board)[enemy_pos];
+          if enemy_board_cell.ant < 2 || enemy_board_cell.dead {
+            continue;
+          }
+          let cur_distance = manhattan(width, height, ant_pos, enemy_pos);
+          if cur_distance < min_distance_to_enemy {
+            min_distance_to_enemy = cur_distance;
+          }
+        }
+        if min_distance_to_enemy != uint::MAX {
+          distance_to_enemies += min_distance_to_enemy;
+        }
+      }
     }
   }
   for &ant_pos in ants.iter() {
     board.get_mut(ant_pos).attack = 0;
+    board.get_mut(ant_pos).dead = false;
   }
-  (enemies_dead_count * ENEMIES_DEAD_ESTIMATION_CONST) as int - (ours_dead_count * OURS_DEAD_ESTIMATION_CONST) as int
+  let enemies_dead_estimation_conts = if aggressive { ENEMIES_DEAD_AGGRESSIVE_ESTIMATION_CONST } else { ENEMIES_DEAD_ESTIMATION_CONST };
+  let ours_dead_estimation_conts = if aggressive { OURS_DEAD_AGGRESSIVE_ESTIMATION_CONST } else { OURS_DEAD_ESTIMATION_CONST };
+  let our_food_estimation_const = if aggressive { OUR_FOOD_AGGRESSIVE_ESTIMATION_CONST } else { OUR_FOOD_ESTIMATION_CONST };
+  let enemy_food_estimation_const = if aggressive { ENEMY_FOOD_AGGRESSIVE_ESTIMATION_CONST } else { ENEMY_FOOD_ESTIMATION_CONST };
+  let destroyed_enemy_anthill_estimation_const = if aggressive { DESTROYED_ENEMY_ANTHILL_AGGRESSIVE_ESTIMATION_CONST } else { DESTROYED_ENEMY_ANTHILL_ESTIMATION_CONST };
+  let destroyed_our_anthill_estimation_const = if aggressive { DESTROYED_OUR_ANTHILL_AGGRESSIVE_ESTIMATION_CONST } else { DESTROYED_OUR_ANTHILL_ESTIMATION_CONST };
+  let distance_to_enemies_estimation_conts = if aggressive { DISTANCE_TO_ENEMIES_AGGRESSIVE_ESTIMATION_CONST } else { DISTANCE_TO_ENEMIES_ESTIMATION_CONST };
+  (enemies_dead_count * enemies_dead_estimation_conts) as int - (ours_dead_count * ours_dead_estimation_conts) as int +
+  (our_food * our_food_estimation_const) as int - (enemy_food * enemy_food_estimation_const) as int +
+  (destroyed_enemy_anthills * destroyed_enemy_anthill_estimation_const) as int - (destroyed_our_anthills * destroyed_our_anthill_estimation_const) as int -
+  (distance_to_enemies * distance_to_enemies_estimation_conts) as int
 }
 
 fn get_chain_begin(mut pos: uint, board: &Vec<BoardCell>) -> uint {
@@ -1061,7 +1177,7 @@ fn ant_owner(cell: Cell) -> Option<uint> {
   }
 }
 
-fn minimax_min(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, groups: &Vec<uint>, dangerous_place_for_enemies: &Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: int) -> int {
+fn minimax_min(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, groups: &Vec<uint>, dangerous_place_for_enemies: &Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: int, aggressive: bool) -> int {
   if idx < enemies.len() {
     let pos = enemies[idx];
     let mut moves = DList::new();
@@ -1071,7 +1187,7 @@ fn minimax_min(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, en
       moved.push(next_pos);
       board.get_mut(next_pos).ant = ant_owner(world[pos]).unwrap() + 1;
       board.get_mut(next_pos).cycle = pos + 1;
-      let cur_estimate = minimax_min(width, height, idx + 1, moved, enemies, world, groups, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha);
+      let cur_estimate = minimax_min(width, height, idx + 1, moved, enemies, world, groups, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, aggressive);
       board.get_mut(next_pos).ant = 0;
       board.get_mut(next_pos).cycle = 0;
       moved.pop();
@@ -1084,11 +1200,11 @@ fn minimax_min(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, en
     }
     min_estimate
   } else {
-    estimate(width, height, world, attack_radius2, moved, board, tags, tagged)
+    estimate(width, height, world, attack_radius2, moved, board, tags, tagged, aggressive)
   }
 }
 
-fn minimax_max(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, groups: &Vec<uint>, dangerous_place: &Vec<bool>, dangerous_place_for_enemies: &mut Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: &mut int, best_moves: &mut Vec<uint>) {
+fn minimax_max(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, groups: &Vec<uint>, dangerous_place: &Vec<bool>, dangerous_place_for_enemies: &mut Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: &mut int, best_moves: &mut Vec<uint>, aggressive: bool) {
   if idx < ours.len() {
     let pos = ours[idx];
     let mut moves = DList::new();
@@ -1097,7 +1213,7 @@ fn minimax_max(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, ou
       moved.push(next_pos);
       board.get_mut(next_pos).ant = 1;
       board.get_mut(next_pos).cycle = pos + 1;
-      minimax_max(width, height, idx + 1, moved, ours, enemies, world, groups, dangerous_place, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, best_moves);
+      minimax_max(width, height, idx + 1, moved, ours, enemies, world, groups, dangerous_place, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, best_moves, aggressive);
       board.get_mut(next_pos).ant = 0;
       board.get_mut(next_pos).cycle = 0;
       moved.pop();
@@ -1114,7 +1230,7 @@ fn minimax_max(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, ou
       }, |_, _, _| { false });
       clear_tags(tags, tagged);
     }
-    let cur_estimate = minimax_min(width, height, 0, moved, enemies, world, groups, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, *alpha);
+    let cur_estimate = minimax_min(width, height, 0, moved, enemies, world, groups, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, *alpha, aggressive);
     for &ant_pos in moved.iter() {
       simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _, _, _| {
         if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
@@ -1134,6 +1250,49 @@ fn minimax_max(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, ou
       }
     }
   }
+}
+
+fn calculate_aggressive_place(colony: &mut Colony) {
+  let aggressive_place = &mut colony.aggressive_place;
+  for &pos in colony.ours_ants.iter() {
+    let mut neighbors = 0;
+    if colony.world[n(colony.width, colony.height, pos)] == Ant(0) {
+      neighbors += 1;
+    }
+    if colony.world[w(colony.width, pos)] == Ant(0) {
+      neighbors += 1;
+    }
+    if colony.world[s(colony.width, colony.height, pos)] == Ant(0) {
+      neighbors += 1;
+    }
+    if colony.world[e(colony.width, pos)] == Ant(0) {
+      neighbors += 1;
+    }
+    if colony.world[nw(colony.width, colony.height, pos)] == Ant(0) {
+      neighbors += 1;
+    }
+    if colony.world[ne(colony.width, colony.height, pos)] == Ant(0) {
+      neighbors += 1;
+    }
+    if colony.world[sw(colony.width, colony.height, pos)] == Ant(0) {
+      neighbors += 1;
+    }
+    if colony.world[se(colony.width, colony.height, pos)] == Ant(0) {
+      neighbors += 1;
+    }
+    if neighbors >= NEIGHBORS_FOR_AGGRESSIVE {
+      *aggressive_place.get_mut(pos) = true;
+    }
+  }
+  wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_anthills.iter(), |pos, _, path_size, _, _, _| {
+    if path_size <= OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE {
+      *aggressive_place.get_mut(pos) = true;
+      true
+    } else {
+      false
+    }
+  }, |_, _, _, _| { false });
+  clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
 fn calculate_dangerous_place(colony: &mut Colony) {
@@ -1168,7 +1327,14 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     group_index += 1;
     if !enemies.is_empty() {
       let mut alpha = int::MIN;
-      minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, &colony.dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves);
+      let mut aggressive = false;
+      for &pos in enemies.iter() {
+        if colony.aggressive_place[pos] {
+          aggressive = true;
+          break;
+        }
+      }
+      minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, &colony.dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves, aggressive);
       let mut moves = DList::new();
       for i in range(0u, ours.len()) {
         let pos = ours[i];
@@ -1190,6 +1356,7 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colo
   colony.cur_turn += 1;
   update_world(colony, input);
   calculate_dangerous_place(colony);
+  calculate_aggressive_place(colony);
   attack(colony, output);
   attack_anthills(colony, output);
   gather_food(colony, output);
