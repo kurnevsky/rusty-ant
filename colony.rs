@@ -1204,7 +1204,7 @@ fn minimax_min(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, en
   }
 }
 
-fn minimax_max(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, groups: &Vec<uint>, dangerous_place: &Vec<bool>, dangerous_place_for_enemies: &mut Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: &mut int, best_moves: &mut Vec<uint>, aggressive: bool) {
+fn minimax_max(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &mut Vec<uint>, world: &Vec<Cell>, groups: &Vec<uint>, dangerous_place: &Vec<bool>, dangerous_place_for_enemies: &mut Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: &mut int, best_moves: &mut Vec<uint>, aggressive: bool) {
   if idx < ours.len() {
     let pos = ours[idx];
     let mut moves = DList::new();
@@ -1230,6 +1230,7 @@ fn minimax_max(width: uint, height: uint, idx: uint, moved: &mut DList<uint>, ou
       }, |_, _, _| { false });
       clear_tags(tags, tagged);
     }
+    enemies.sort_by(|&pos1, &pos2| if (*dangerous_place_for_enemies)[pos1] && !(*dangerous_place_for_enemies)[pos2] { Less } else { Equal });
     let cur_estimate = minimax_min(width, height, 0, moved, enemies, world, groups, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, *alpha, aggressive);
     for &ant_pos in moved.iter() {
       simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _, _, _| {
@@ -1336,7 +1337,7 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
         }
       }
       ours.sort_by(|&pos1, &pos2| if dangerous_place[pos1] && !dangerous_place[pos2] { Less } else { Equal });
-      minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &enemies, &colony.world, &colony.groups, dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves, aggressive);
+      minimax_max(colony.width, colony.height, 0, &mut moved, &ours, &mut enemies, &colony.world, &colony.groups, dangerous_place, &mut colony.dangerous_place_for_enemies, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, &mut best_moves, aggressive);
       let mut moves = DList::new();
       for i in range(0u, ours.len()) {
         let pos = ours[i];
