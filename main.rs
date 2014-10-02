@@ -11,6 +11,7 @@ mod coordinates;
 mod cell;
 mod move;
 mod input;
+mod wave;
 mod colony;
 
 fn read_nonempty_line(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> String {
