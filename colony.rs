@@ -16,6 +16,8 @@ use cell::*;
 use move::*;
 use input::*;
 
+static TERRITORY_PATH_SIZE_CONST: uint = 4;
+
 static GATHERING_FOOD_PATH_SIZE: uint = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
 
 static ATTACK_ANTHILLS_PATH_SIZE: uint = 10; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
@@ -538,10 +540,10 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let height = colony.height;
   let world = &mut colony.world;
   let territory = &mut colony.territory;
-  let max_view_radius_manhattan = colony.max_view_radius_manhattan;
+  let territory_path_size = colony.max_view_radius_manhattan + TERRITORY_PATH_SIZE_CONST;
   let moved = &mut colony.moved;
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()).chain(colony.enemies_anthills.iter()), |pos, start_pos, path_size, _, _, _| {
-    if path_size <= max_view_radius_manhattan && (*world)[pos] != Water {
+    if path_size <= territory_path_size && (*world)[pos] != Water {
       match (*world)[start_pos] {
         AnthillWithAnt(player) => *territory.get_mut(pos) = player + 1,
         Ant(player) => *territory.get_mut(pos) = player + 1,
@@ -1312,20 +1314,20 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colo
   colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
-  if elapsed_time(colony.start_time) < CRITICAL_TIME { return; }
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   update_world(colony, input);
-  if elapsed_time(colony.start_time) < CRITICAL_TIME { return; }
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   calculate_dangerous_place(colony);
-  if elapsed_time(colony.start_time) < CRITICAL_TIME { return; }
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   calculate_aggressive_place(colony);
-  if elapsed_time(colony.start_time) < CRITICAL_TIME { return; }
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   attack(colony, output);
-  if elapsed_time(colony.start_time) < CRITICAL_TIME { return; }
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   attack_anthills(colony, output);
-  if elapsed_time(colony.start_time) < CRITICAL_TIME { return; }
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   gather_food(colony, output);
-  if elapsed_time(colony.start_time) < CRITICAL_TIME { return; }
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   discover(colony, output);
-  if elapsed_time(colony.start_time) < CRITICAL_TIME { return; }
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   travel(colony, output);
 }
