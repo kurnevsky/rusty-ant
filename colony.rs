@@ -579,17 +579,18 @@ fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, atta
   let mut enemies_q = DList::new();
   ours_q.push(ant_pos);
   *groups.get_mut(ant_pos) = group_index;
-  while !ours_q.is_empty() || !enemies_q.is_empty() {
-    if !ours_q.is_empty() {
-      let pos = ours_q.pop_front().unwrap();
-      ours.push(pos);
-      find_near_ants(width, height, pos, attack_radius2, world, moved, groups, group_index, tags, tagged, &mut enemies_q, false);
-    }
-    if !enemies_q.is_empty() {
+  while !ours_q.is_empty() && ours.len() < 5 {
+    let pos = ours_q.pop_front().unwrap();
+    ours.push(pos);
+    find_near_ants(width, height, pos, attack_radius2, world, moved, groups, group_index, tags, tagged, &mut enemies_q, false);
+    while !enemies_q.is_empty() {
       let pos = enemies_q.pop_front().unwrap();
       enemies.push(pos);
       find_near_ants(width, height, pos, attack_radius2, world, moved, groups, group_index, tags, tagged, &mut ours_q, true);
     }
+  }
+  for &pos in ours_q.iter().chain(enemies_q.iter()) {
+    *groups.get_mut(pos) = 0;
   }
 }
 
