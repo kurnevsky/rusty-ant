@@ -1,5 +1,4 @@
-use point::*;
-use direction::*;
+use coordinates::*;
 
 pub struct Move {
   pub point: Point,

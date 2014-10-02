@@ -2,14 +2,12 @@
 
 use std::collections::*;
 use std::io;
-use point::*;
-use direction::*;
+use coordinates::*;
 use move::*;
 use colony::*;
 use input::*;
 
-mod point;
-mod direction;
+mod coordinates;
 mod cell;
 mod move;
 mod input;

@@ -1,4 +1,4 @@
-use point::*;
+use coordinates::*;
 
 pub enum Input {
   InputWater(Point),
