@@ -572,14 +572,14 @@ fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint,
   clear_tags(tags, tagged);
 }
 
-fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ours: &mut T, enemies: &mut T) {
+fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ours: &mut Vec<uint>, enemies: &mut Vec<uint>) {
   ours.clear();
   enemies.clear();
   let mut ours_q = DList::new();
   let mut enemies_q = DList::new();
   ours_q.push(ant_pos);
   *groups.get_mut(ant_pos) = group_index;
-  while !ours_q.is_empty() && ours.len() < 5 {
+  while !ours_q.is_empty() && ours.len() < 6 {
     let pos = ours_q.pop_front().unwrap();
     ours.push(pos);
     find_near_ants(width, height, pos, attack_radius2, world, moved, groups, group_index, tags, tagged, &mut enemies_q, false);
@@ -589,7 +589,7 @@ fn get_group<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, atta
       find_near_ants(width, height, pos, attack_radius2, world, moved, groups, group_index, tags, tagged, &mut ours_q, true);
     }
   }
-  for &pos in ours_q.iter().chain(enemies_q.iter()) {
+  for &pos in ours_q.iter().chain(enemies_q.iter()).chain(enemies.iter()) {
     *groups.get_mut(pos) = 0;
   }
 }
