@@ -146,7 +146,8 @@ impl Colony {
 }
 
 fn get_time() -> u64 {
-  time::precise_time_ns() / 1000000
+  let ts = time::get_time();
+  (ts.sec as u64) * 1000 + (ts.nsec as u64) / 1000000
 }
 
 fn elapsed_time(start_time: u64) -> uint {
