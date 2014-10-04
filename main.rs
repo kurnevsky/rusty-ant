@@ -8,6 +8,7 @@ use colony::*;
 use input::*;
 
 mod coordinates;
+mod time;
 mod cell;
 mod move;
 mod input;
