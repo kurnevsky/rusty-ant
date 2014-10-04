@@ -321,6 +321,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
       }
     }, |pos, _, _| { (*territory)[pos] != 1 });
     if goal.is_none() {
+      clear_tags(&mut colony.tags, &mut colony.tagged);
       continue;
     }
     find_path(&mut colony.tags, ant_pos, goal.unwrap(), &mut path);
