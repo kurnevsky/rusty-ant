@@ -1263,6 +1263,42 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   }
 }
 
+fn get_random_move(width: uint, height: uint, world: &Vec<Cell>, rng: &mut XorShiftRng, pos: uint) -> uint {
+  let mut moves = Vec::new();
+  moves.push(pos);
+  let n_pos = n(width, height, pos);
+  if is_free(world[n_pos]) {
+    moves.push(n_pos);
+  }
+  let w_pos = w(width, pos);
+  if is_free(world[w_pos]) {
+    moves.push(w_pos);
+  }
+  let s_pos = s(width, height, pos);
+  if is_free(world[s_pos]) {
+    moves.push(s_pos);
+  }
+  let e_pos = e(width, pos);
+  if is_free(world[e_pos]) {
+    moves.push(e_pos);
+  }
+  moves[rng.gen_range(0, moves.len())]
+}
+
+fn move_random<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+  for &ant_pos in colony.ours_ants.iter() {
+    if colony.moved[ant_pos] {
+      continue;
+    }
+    let next_pos = get_random_move(colony.width, colony.height, &colony.world, &mut colony.rng, ant_pos);
+    if next_pos != ant_pos {
+      move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
+    } else {
+      *colony.moved.get_mut(ant_pos) = true;
+    }
+  }
+}
+
 pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
   colony.start_time = get_time();
   output.clear();
@@ -1283,4 +1319,6 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colo
   discover(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   travel(colony, output);
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  move_random(colony, output);
 }
