@@ -15,7 +15,7 @@ impl Tag {
   }
 }
 
-pub fn wave<'r, T: Iterator<&'r uint>>(width: uint, height: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, start: &mut T, cond: |uint, uint, uint, uint, uint, &mut uint| -> bool, stop_cond: |uint, uint, uint, uint| -> bool) -> Option<uint> {
+pub fn wave<'r, T1: Iterator<&'r uint>, T2: MutableSeq<uint>>(width: uint, height: uint, tags: &mut Vec<Tag>, tagged: &mut T2, start: &mut T1, cond: |uint, uint, uint, uint, uint, &mut uint| -> bool, stop_cond: |uint, uint, uint, uint| -> bool) -> Option<uint> {
   let mut q = DList::new();
   for &pos in *start {
     if cond(pos, pos, 0, pos, 0, &mut tags.get_mut(pos).general) {
@@ -74,11 +74,11 @@ pub fn wave<'r, T: Iterator<&'r uint>>(width: uint, height: uint, tags: &mut Vec
   return None;
 }
 
-pub fn simple_wave(width: uint, height: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, start: uint, cond: |uint, uint, uint, uint, &mut uint| -> bool, stop_cond: |uint, uint, uint| -> bool) -> Option<uint> {
+pub fn simple_wave<T: MutableSeq<uint>>(width: uint, height: uint, tags: &mut Vec<Tag>, tagged: &mut T, start: uint, cond: |uint, uint, uint, uint, &mut uint| -> bool, stop_cond: |uint, uint, uint| -> bool) -> Option<uint> {
   wave(width, height, tags, tagged, &mut Some(start).iter(), |pos, _, path_size, prev, prev_general_tag, general_tag| { cond(pos, path_size, prev, prev_general_tag, general_tag) }, |pos, _, path_size, prev| { stop_cond(pos, path_size, prev) })
 }
 
-pub fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut DList<uint>) {
+pub fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) {
   for &pos in tagged.iter() {
     let tag = tags.get_mut(pos);
     tag.start = 0;

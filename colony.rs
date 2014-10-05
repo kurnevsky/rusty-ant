@@ -92,9 +92,9 @@ pub struct Colony {
   groups: Vec<uint>,
   board: Vec<BoardCell>,
   tags: Vec<Tag>, // Тэги для волнового алгоритма.
-  tagged: DList<uint>, // Список позиций start_tags и path_tags с ненулевыми значениями.
-  ours_ants: DList<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
-  enemies_ants: DList<uint>,
+  tagged: Vec<uint>, // Список позиций start_tags и path_tags с ненулевыми значениями.
+  ours_ants: Vec<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
+  enemies_ants: Vec<uint>,
   enemies_anthills: DList<uint>,
   ours_anthills: DList<uint>,
   food: DList<uint> // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
@@ -131,9 +131,9 @@ impl Colony {
       groups: Vec::from_elem(len, 0u),
       board: Vec::from_elem(len, BoardCell { ant: 0, attack: 0, cycle: 0, dead: false }),
       tags: Vec::from_elem(len, Tag::new()),
-      tagged: DList::new(),
-      ours_ants: DList::new(),
-      enemies_ants: DList::new(),
+      tagged: Vec::with_capacity(len),
+      ours_ants: Vec::with_capacity(len),
+      enemies_ants: Vec::with_capacity(len),
       enemies_anthills: DList::new(),
       ours_anthills: DList::new(),
       food: DList::new()
@@ -176,7 +176,7 @@ fn move_all<T: MutableSeq<Move>>(width: uint, height: uint, world: &mut Vec<Cell
   }
 }
 
-fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint, world: &Vec<Cell>, discovered_area: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ant_pos: uint) -> Option<uint> {
+fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint, world: &Vec<Cell>, discovered_area: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ant_pos: uint) -> Option<uint> {
   let mut n_score = 0u;
   let mut s_score = 0u;
   let mut w_score = 0u;
@@ -299,14 +299,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   }, |_, _, _, _| { false });
   clear_tags(&mut colony.tags, &mut colony.tagged);
   let mut path = DList::new();
-  let mut shuffled_ants = Vec::new();
   for &ant_pos in colony.ours_ants.iter() {
-    if !(*moved)[ant_pos] {
-      shuffled_ants.push(ant_pos);
-    }
-  }
-  colony.rng.shuffle(shuffled_ants.as_mut_slice());
-  for &ant_pos in shuffled_ants.iter() {
     if (*moved)[ant_pos] {
       continue;
     }
@@ -522,7 +515,7 @@ fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius
   false
 }
 
-fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, group: &mut T, ours: bool) {
+fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, group: &mut T, ours: bool) {
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, prev, _, _| {
     if (*groups)[pos] == 0 && !moved[pos] {
       match (*world)[pos] {
@@ -556,7 +549,7 @@ fn group_enough(ours_moves_count: uint, enemies_count: uint) -> bool {
   ours_moves_count > 11 && enemies_count > 7
 }
 
-fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, dangerous_place: &Vec<bool>, standing_ants: &Vec<uint>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ours: &mut Vec<uint>, enemies: &mut Vec<uint>) {
+fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, dangerous_place: &Vec<bool>, standing_ants: &Vec<uint>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ours: &mut Vec<uint>, enemies: &mut Vec<uint>) {
   ours.clear();
   enemies.clear();
   let mut ours_moves_count = 0u;
@@ -595,7 +588,7 @@ fn is_near_food(width: uint, height: uint, world: &Vec<Cell>, pos: uint) -> bool
   }
 }
 
-fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board: &Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>) -> bool {
+fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board: &Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> bool {
   let mut result = false;
   let attack_value = board[ant_pos].attack;
   let ant_number = board[ant_pos].ant;
@@ -612,7 +605,7 @@ fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board
   result
 }
 
-fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, aggressive: bool) -> int { //TODO: для оптимизации юзать dangerous_place.
+fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggressive: bool) -> int { //TODO: для оптимизации юзать dangerous_place.
   let mut other_ours = DList::new();
   let mut ours_dead_count = 0u;
   let mut enemies_dead_count = 0u;
@@ -939,7 +932,7 @@ fn get_enemy_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, wo
   }
 }
 
-fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: int, start_time: u64, turn_time: uint, aggressive: bool) -> int {
+fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: int, start_time: u64, turn_time: uint, aggressive: bool) -> int {
   if idx < enemies.len() {
     let pos = enemies[idx];
     let mut moves = DList::new();
@@ -967,7 +960,7 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
   }
 }
 
-fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &mut Vec<uint>, world: &Vec<Cell>, dangerous_place: &Vec<bool>, dangerous_place_for_enemies: &mut Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, alpha: &mut int, aggressive: bool, start_time: u64, turn_time: uint, best_moves: &mut Vec<uint>) {
+fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &mut Vec<uint>, world: &Vec<Cell>, dangerous_place: &Vec<bool>, dangerous_place_for_enemies: &mut Vec<bool>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: &mut int, aggressive: bool, start_time: u64, turn_time: uint, best_moves: &mut Vec<uint>) {
   if idx < ours.len() {
     let pos = ours[idx];
     let mut moves = DList::new();
@@ -1299,12 +1292,19 @@ fn move_random<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   }
 }
 
+fn shuffle(colony: &mut Colony) {
+  colony.rng.shuffle(colony.ours_ants.as_mut_slice());
+  colony.rng.shuffle(colony.enemies_ants.as_mut_slice());
+}
+
 pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
   colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   update_world(colony, input);
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  shuffle(colony);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   calculate_dangerous_place(colony);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
