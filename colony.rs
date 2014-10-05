@@ -54,7 +54,7 @@ static DISTANCE_TO_ENEMIES_AGGRESSIVE_ESTIMATION_CONST: uint = 1;
 
 static STANDING_ANTS_CONST: uint = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
 
-static NEIGHBORS_FOR_AGGRESSIVE: uint = 5; // Количество соседей (включая диагональных), при котором наш муравей считается агрессивным, а с ним и вся группа.
+static NEIGHBORS_FOR_AGGRESSIVE: uint = 6; // Количество соседей (включая диагональных), при котором наш муравей считается агрессивным, а с ним и вся группа.
 
 static OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: uint = 4; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
 
@@ -545,9 +545,9 @@ fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint,
 }
 
 fn group_enough(ours_moves_count: uint, enemies_count: uint) -> bool {
-  ours_moves_count > 22 ||
-  ours_moves_count > 16 && enemies_count > 5 ||
-  ours_moves_count > 12 && enemies_count > 8
+  ours_moves_count > 21 ||
+  ours_moves_count > 15 && enemies_count > 6 ||
+  ours_moves_count > 11 && enemies_count > 7
 }
 
 fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, dangerous_place: &Vec<bool>, standing_ants: &Vec<uint>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut DList<uint>, ours: &mut Vec<uint>, enemies: &mut Vec<uint>) {
