@@ -350,7 +350,11 @@ fn attack_anthills<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let height = colony.height;
   let world = &mut colony.world;
   let moved = &mut colony.moved;
+  let dangerous_place = &colony.dangerous_place;
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_anthills.iter(), |pos, start_pos, path_size, prev, _, _| {
+    if dangerous_place[pos] {
+      return false;
+    }
     match (*world)[pos] {
       Ant(0) | AnthillWithAnt(0) if !(*moved)[pos] => {
         if pos != start_pos && !is_free((*world)[prev]) {
@@ -373,8 +377,9 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let world = &mut colony.world;
   let gathered_food = &mut colony.gathered_food;
   let moved = &mut colony.moved;
+  let dangerous_place = &colony.dangerous_place;
   for &pos in colony.ours_ants.iter() {
-    if (*moved)[pos] {
+    if (*moved)[pos] || dangerous_place[pos] {
       continue;
     }
     let n_pos = n(width, height, pos);
@@ -399,6 +404,9 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     }
   }
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.food.iter(), |pos, start_pos, path_size, prev, _, _| {
+    if dangerous_place[pos] {
+      return false;
+    }
     match (*world)[pos] {
       Ant(0) | AnthillWithAnt(0) if (*gathered_food)[start_pos] == 0 && !(*moved)[pos] => {
         if pos != start_pos && !is_free((*world)[prev]) {
@@ -562,7 +570,7 @@ fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, wor
   while !ours_q.is_empty() && !group_enough(ours_moves_count, enemies_count) {
     let pos = ours_q.pop_front().unwrap();
     ours.push(pos);
-    ours_moves_count += get_our_moves_count(width, height, pos, world, dangerous_place);
+    ours_moves_count += get_moves_count(width, height, pos, world, dangerous_place);
     find_near_ants(width, height, pos, attack_radius2, world, moved, groups, group_index, tags, tagged, &mut enemies_q, false);
     while !enemies_q.is_empty() {
       let pos = enemies_q.pop_front().unwrap();
@@ -738,7 +746,7 @@ fn get_chain_begin(mut pos: uint, board: &Vec<BoardCell>) -> uint {
   pos
 }
 
-fn get_our_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dangerous_place: &Vec<bool>) -> uint {
+fn get_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dangerous_place: &Vec<bool>) -> uint {
   let mut result = 1u;
   let mut escape = false;
   if !dangerous_place[pos] {
@@ -786,6 +794,30 @@ fn get_our_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, 
     } else {
       result += 1;
     }
+  }
+  result
+}
+
+fn get_escape_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dangerous_place: &Vec<bool>) -> uint {
+  let mut result = 0u;
+  if !dangerous_place[pos] {
+    result += 1;
+  }
+  let n_pos = n(width, height, pos);
+  let s_pos = s(width, height, pos);
+  let w_pos = w(width, pos);
+  let e_pos = e(width, pos);
+  if !is_water_or_food(world[n_pos]) && !dangerous_place[n_pos] {
+    result += 1;
+  }
+  if !is_water_or_food(world[w_pos]) && !dangerous_place[w_pos] {
+    result += 1;
+  }
+  if !is_water_or_food(world[s_pos]) && !dangerous_place[s_pos] {
+    result += 1;
+  }
+  if !is_water_or_food(world[e_pos]) && !dangerous_place[e_pos] {
+    result += 1;
   }
   result
 }
@@ -964,7 +996,13 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
       }, |_, _, _| { false });
       clear_tags(tags, tagged);
     }
-    enemies.sort_by(|&pos1, &pos2| if (*dangerous_place_for_enemies)[pos1] && !(*dangerous_place_for_enemies)[pos2] { Less } else { Equal });
+    enemies.sort_by(|&pos1, &pos2|
+      if (*dangerous_place_for_enemies)[pos1] && !(*dangerous_place_for_enemies)[pos2] {
+        Less
+      } else {
+        get_escape_moves_count(width, height, pos1, world, dangerous_place_for_enemies).cmp(&get_escape_moves_count(width, height, pos2, world, dangerous_place_for_enemies))
+      }
+    );
     let cur_estimate = minimax_min(width, height, 0, minimax_moved, enemies, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, *alpha, start_time, turn_time, aggressive);
     for &ant_pos in minimax_moved.iter() {
       simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _, _, _| {
@@ -1009,7 +1047,13 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
           break;
         }
       }
-      ours.sort_by(|&pos1, &pos2| if colony.dangerous_place[pos1] && !colony.dangerous_place[pos2] { Less } else { Equal });
+      ours.sort_by(|&pos1, &pos2|
+        if colony.dangerous_place[pos1] && !colony.dangerous_place[pos2] {
+          Less
+        } else {
+          get_escape_moves_count(colony.width, colony.height, pos1, &colony.world, &colony.dangerous_place).cmp(&get_escape_moves_count(colony.width, colony.height, pos2, &colony.world, &colony.dangerous_place))
+        }
+      );
       for &pos in ours.iter() {
         remove_ant(&mut colony.world, pos);
       }
@@ -1232,11 +1276,11 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colo
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   calculate_aggressive_place(colony);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
-  attack(colony, output);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   attack_anthills(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   gather_food(colony, output);
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  attack(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   discover(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
