@@ -309,7 +309,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
       continue;
     }
     *tmp.get_mut(ant_pos) = 1;
-    let goal = simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, prev, _| {
+    let goal = simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, prev| {
       let cell = (*world)[pos];
       let is_column = (*tmp)[prev];
       if cell == Water || is_column == 1 && ((*moved)[pos] && is_players_ant(cell, 0) || cell == Food) {
@@ -331,7 +331,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
       *tmp.get_mut(pos) = 0;
     }
     clear_tags(&mut colony.tags, &mut colony.tagged);
-    let mut moves = DList::new();
+    let mut moves = DList::new(); //TODO: refactor.
     moves.push(ant_pos);
     for &pos in path.iter() {
       moves.push(pos);
