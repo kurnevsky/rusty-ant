@@ -14,6 +14,8 @@ use input::*;
 
 static TERRITORY_PATH_SIZE_CONST: uint = 5;
 
+static APPROACH_PATH_SIZE_CONST: uint = 2;
+
 static GATHERING_FOOD_PATH_SIZE: uint = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
 
 static ATTACK_ANTHILLS_PATH_SIZE: uint = 20; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
@@ -79,6 +81,7 @@ pub struct Colony {
   rng: XorShiftRng, // Генератор случайных чисел.
   min_view_radius_manhattan: uint,
   max_view_radius_manhattan: uint,
+  max_attack_radius_manhattan: uint,
   enemies_count: uint, // Известное количество врагов.
   world: Vec<Cell>, // Текущее состояние мира. При ходе нашего муравья он передвигается на новую клетку.
   last_world: Vec<Cell>, // Предыдущее состояние мира со сделавшими ход нашими муравьями.
@@ -92,6 +95,7 @@ pub struct Colony {
   dangerous_place_for_enemies: Vec<bool>,
   aggressive_place: Vec<bool>,
   groups: Vec<uint>,
+  fighting: Vec<bool>,
   board: Vec<BoardCell>,
   tmp: Vec<uint>,
   tags: Vec<Tag>, // Тэги для волнового алгоритма.
@@ -119,6 +123,7 @@ impl Colony {
       rng: SeedableRng::from_seed([1, ((seed >> 32) & 0xFFFFFFFF) as u32, 3, (seed & 0xFFFFFFFF) as u32]),
       min_view_radius_manhattan: (view_radius2 as f32).sqrt() as uint,
       max_view_radius_manhattan: ((view_radius2 * 2) as f32).sqrt() as uint,
+      max_attack_radius_manhattan: ((attack_radius2 * 2) as f32).sqrt() as uint,
       enemies_count: 0,
       world: Vec::from_elem(len, Unknown),
       last_world: Vec::from_elem(len, Unknown),
@@ -132,6 +137,7 @@ impl Colony {
       dangerous_place_for_enemies: Vec::from_elem(len, false),
       aggressive_place: Vec::from_elem(len, false),
       groups: Vec::from_elem(len, 0u),
+      fighting: Vec::from_elem(len, false),
       board: Vec::from_elem(len, BoardCell { ant: 0, attack: 0, cycle: 0, dead: false }),
       tmp: Vec::from_elem(len, 0u),
       tags: Vec::from_elem(len, Tag::new()),
@@ -1078,8 +1084,42 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
         }
         move_all(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, &moves);
       }
+      for &pos in enemies.iter() {
+        *colony.fighting.get_mut(pos) = true;
+      }
     }
   }
+}
+
+fn approach_enemies<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+  let width = colony.width;
+  let height = colony.height;
+  let approach_path_size = colony.max_attack_radius_manhattan + APPROACH_PATH_SIZE_CONST;
+  let fighting = &colony.fighting;
+  let dangerous_place = &colony.dangerous_place;
+  let world = &mut colony.world;
+  let moved = &mut colony.moved;
+  wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_ants.iter().filter(|&&pos| { fighting[pos] }), |pos, _, path_size, prev| {
+    if path_size > approach_path_size {
+      return false;
+    }
+    let cell = (*world)[pos];
+    if !is_free(cell) {
+      if is_players_ant(cell, 0) {
+        if !dangerous_place[prev] {
+          move(width, height, world, moved, output, pos, prev);
+        } else {
+          *moved.get_mut(pos) = true;
+        }
+        true
+      } else {
+        false
+      }
+    } else {
+      true
+    }
+  }, |_, _, _, _| { false });
+  clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
 fn calculate_aggressive_place(colony: &mut Colony) {
@@ -1162,6 +1202,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
     *colony.groups.get_mut(pos) = 0;
     *colony.dangerous_place.get_mut(pos) = false;
     *colony.aggressive_place.get_mut(pos) = false;
+    *colony.fighting.get_mut(pos) = false;
   }
   colony.ours_ants.clear();
   colony.enemies_ants.clear();
@@ -1329,9 +1370,11 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colo
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   attack(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
-  discover(colony, output);
+  approach_enemies(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
-  travel(colony, output);
+  discover(colony, output); //TODO: dangerous_place
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  travel(colony, output); //TODO: dangerous_place
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   move_random(colony, output);
 }
