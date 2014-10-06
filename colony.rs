@@ -16,7 +16,9 @@ static TERRITORY_PATH_SIZE_CONST: uint = 5;
 
 static GATHERING_FOOD_PATH_SIZE: uint = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
 
-static ATTACK_ANTHILLS_PATH_SIZE: uint = 10; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
+static ATTACK_ANTHILLS_PATH_SIZE: uint = 20; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
+
+static ATTACK_ANTHILLS_ANTS_COUNT: uint = 2;
 
 static MINIMAX_CRITICAL_TIME: uint = 100;
 
@@ -352,24 +354,29 @@ fn attack_anthills<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let world = &mut colony.world;
   let moved = &mut colony.moved;
   let dangerous_place = &colony.dangerous_place;
+  let tmp = &mut colony.tmp;
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_anthills.iter(), |pos, start_pos, path_size, prev| {
-    if dangerous_place[pos] {
+    if dangerous_place[pos] || path_size > ATTACK_ANTHILLS_PATH_SIZE || (*tmp)[start_pos] > ATTACK_ANTHILLS_ANTS_COUNT {
       return false;
     }
     match (*world)[pos] {
       Ant(0) | AnthillWithAnt(0) if !(*moved)[pos] => {
-        if pos != start_pos && !is_free((*world)[prev]) {
+        if !is_free((*world)[prev]) {
           false
         } else {
+          *tmp.get_mut(start_pos) += 1;
           move(width, height, world, moved, output, pos, prev);
           true
         }
       },
       Unknown | Water => false,
-      _ => path_size <= ATTACK_ANTHILLS_PATH_SIZE
+      _ => true
     }
   }, |_, _, _, _| { false });
   clear_tags(&mut colony.tags, &mut colony.tagged);
+  for &pos in colony.enemies_anthills.iter() {
+    *tmp.get_mut(pos) = 0;
+  }
 }
 
 fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
@@ -405,7 +412,7 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     }
   }
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.food.iter(), |pos, start_pos, path_size, prev| {
-    if dangerous_place[pos] {
+    if dangerous_place[pos] || path_size > GATHERING_FOOD_PATH_SIZE {
       return false;
     }
     match (*world)[pos] {
@@ -419,7 +426,7 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
         }
       },
       Unknown | Water => false,
-      _ => path_size <= GATHERING_FOOD_PATH_SIZE
+      _ => true
     }
   }, |_, _, _, _| { false });
   clear_tags(&mut colony.tags, &mut colony.tagged);
