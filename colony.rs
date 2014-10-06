@@ -331,20 +331,16 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
       *tmp.get_mut(pos) = 0;
     }
     clear_tags(&mut colony.tags, &mut colony.tagged);
-    let mut moves = DList::new(); //TODO: refactor.
-    moves.push(ant_pos);
+    let mut path_pos = ant_pos;
+    let mut moves = DList::new();
     for &pos in path.iter() {
-      moves.push(pos);
-      let cell = (*world)[pos];
-      if cell != Ant(0) && cell != AnthillWithAnt(0) {
+      moves.push((path_pos, pos));
+      if !is_players_ant((*world)[pos], 0) {
         break;
       }
+      path_pos = pos;
     }
-    while moves.len() > 1 {
-      let next_ant_pos = moves.pop().unwrap();
-      let pos = *moves.back().unwrap();
-      move(width, height, world, moved, output, pos, next_ant_pos);
-    }
+    move_all(width, height, world, moved, output, &moves);
   }
 }
 
