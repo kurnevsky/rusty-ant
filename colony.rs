@@ -1172,8 +1172,20 @@ fn calculate_dangerous_place(colony: &mut Colony) {
   let attack_radius2 = colony.attack_radius2;
   let dangerous_place = &mut colony.dangerous_place;
   for &ant_pos in colony.enemies_ants.iter() {
-    simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, prev| {
-      if euclidean(width, height, ant_pos, prev) <= attack_radius2 {
+    let n_pos = n(colony.width, colony.height, ant_pos);
+    let s_pos = s(colony.width, colony.height, ant_pos);
+    let w_pos = w(colony.width, ant_pos);
+    let e_pos = e(colony.width, ant_pos);
+    let n_pos_water_or_food = is_water_or_food(colony.world[n_pos]);
+    let s_pos_water_or_food = is_water_or_food(colony.world[s_pos]);
+    let w_pos_water_or_food = is_water_or_food(colony.world[w_pos]);
+    let e_pos_water_or_food = is_water_or_food(colony.world[e_pos]);
+    simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, _| {
+      if euclidean(width, height, ant_pos, pos) <= attack_radius2 ||
+         euclidean(width, height, n_pos, pos) <= attack_radius2 && !n_pos_water_or_food ||
+         euclidean(width, height, s_pos, pos) <= attack_radius2 && !s_pos_water_or_food ||
+         euclidean(width, height, w_pos, pos) <= attack_radius2 && !w_pos_water_or_food ||
+         euclidean(width, height, e_pos, pos) <= attack_radius2 && !e_pos_water_or_food {
         *dangerous_place.get_mut(pos) = true;
         true
       } else {
