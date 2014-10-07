@@ -3,14 +3,14 @@
 use std::collections::*;
 use std::io;
 use coordinates::*;
-use move::*;
+use step::*;
 use colony::*;
 use input::*;
 
 mod coordinates;
 mod time;
 mod cell;
-mod move;
+mod step;
 mod input;
 mod wave;
 mod colony;
@@ -242,7 +242,7 @@ fn turn_info(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<Bo
   }
 }
 
-fn print_output(writer: &mut io::LineBufferedWriter<io::stdio::StdWriter>, output: &mut DList<Move>) {
+fn print_output(writer: &mut io::LineBufferedWriter<io::stdio::StdWriter>, output: &mut DList<Step>) {
   for i in output.iter() {
     writer.write_str("o ").ok();
     writer.write_uint(i.point.y).ok();
@@ -270,7 +270,7 @@ fn main() {
   let mut stdin = io::stdin();
   let mut stderr = io::stderr();
   let mut stdout = io::stdout();
-  let mut output: DList<Move> = DList::new();
+  let mut output: DList<Step> = DList::new();
   if read_turn(&mut stdin) != Some(0) {
     stderr.write_line("Icorrect input 1!").ok();
     return;

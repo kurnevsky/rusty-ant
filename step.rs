@@ -1,6 +1,6 @@
 use coordinates::*;
 
-pub struct Move {
+pub struct Step {
   pub point: Point,
   pub direction: Direction
 }

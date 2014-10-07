@@ -9,7 +9,7 @@ use coordinates::*;
 use time::*;
 use wave::*;
 use cell::*;
-use move::*;
+use step::*;
 use input::*;
 
 static TERRITORY_PATH_SIZE_CONST: uint = 5;
@@ -162,15 +162,15 @@ fn set_ant(world: &mut Vec<Cell>, pos: uint, player: uint) {
   *world.get_mut(pos) = if (*world)[pos] == Anthill(player) { AnthillWithAnt(player) } else { Ant(player) };
 }
 
-fn move<T: MutableSeq<Move>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, pos: uint, next_pos: uint) {
+fn move_one<T: MutableSeq<Step>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, pos: uint, next_pos: uint) {
   remove_ant(world, pos);
   *moved.get_mut(pos) = true;
   *world.get_mut(next_pos) = if (*world)[next_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
   *moved.get_mut(next_pos) = true;
-  output.push(Move { point: from_pos(width, pos), direction: to_direction(width, height, pos, next_pos).unwrap() })
+  output.push(Step { point: from_pos(width, pos), direction: to_direction(width, height, pos, next_pos).unwrap() })
 }
 
-fn move_all<T: MutableSeq<Move>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, moves: &DList<(uint, uint)>) {
+fn move_all<T: MutableSeq<Step>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, moves: &DList<(uint, uint)>) {
   for &(pos, _) in moves.iter() {
     *world.get_mut(pos) = match (*world)[pos] {
       AnthillWithAnt(0) => Anthill(0),
@@ -182,7 +182,7 @@ fn move_all<T: MutableSeq<Move>>(width: uint, height: uint, world: &mut Vec<Cell
     set_ant(world, next_pos, 0);
     *world.get_mut(next_pos) = if (*world)[next_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
     *moved.get_mut(next_pos) = true;
-    output.push(Move { point: from_pos(width, pos), direction: to_direction(width, height, pos, next_pos).unwrap() });
+    output.push(Step { point: from_pos(width, pos), direction: to_direction(width, height, pos, next_pos).unwrap() });
   }
 }
 
@@ -260,7 +260,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
   }
 }
 
-fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+fn discover<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let width = colony.width;
   let height = colony.height;
   let min_view_radius_manhattan = colony.min_view_radius_manhattan;
@@ -280,14 +280,14 @@ fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
           }
         }, |_, _, _| { false });
         clear_tags(&mut colony.tags, &mut colony.tagged);
-        move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, next_pos);
+        move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, next_pos);
       },
       None => { }
     }
   }
 }
 
-fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+fn travel<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let width = colony.width;
   let height = colony.height;
   let world = &mut colony.world;
@@ -351,7 +351,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   }
 }
 
-fn attack_anthills<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+fn attack_anthills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let width = colony.width;
   let height = colony.height;
   let world = &mut colony.world;
@@ -368,7 +368,7 @@ fn attack_anthills<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
           false
         } else {
           *tmp.get_mut(start_pos) += 1;
-          move(width, height, world, moved, output, pos, prev);
+          move_one(width, height, world, moved, output, pos, prev);
           true
         }
       },
@@ -382,7 +382,7 @@ fn attack_anthills<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   }
 }
 
-fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+fn gather_food<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let width = colony.width;
   let height = colony.height;
   let world = &mut colony.world;
@@ -423,7 +423,7 @@ fn gather_food<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
         if pos != start_pos && !is_free((*world)[prev]) {
           false
         } else {
-          move(width, height, world, moved, output, pos, prev);
+          move_one(width, height, world, moved, output, pos, prev);
           *gathered_food.get_mut(start_pos) = pos + 1;
           true
         }
@@ -1029,14 +1029,14 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
     if cur_estimate > *alpha {
       *alpha = cur_estimate;
       best_moves.clear();
-      for &move in minimax_moved.iter() {
-        best_moves.push(move);
+      for &pos in minimax_moved.iter() {
+        best_moves.push(pos);
       }
     }
   }
 }
 
-fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let mut ours = Vec::new();
   let mut enemies = Vec::new();
   let mut minimax_moved = DList::new();
@@ -1092,7 +1092,7 @@ fn attack<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   }
 }
 
-fn approach_enemies<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+fn approach_enemies<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let width = colony.width;
   let height = colony.height;
   let approach_path_size = colony.max_attack_radius_manhattan + APPROACH_PATH_SIZE_CONST;
@@ -1108,7 +1108,7 @@ fn approach_enemies<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     if !is_free(cell) {
       if is_players_ant(cell, 0) {
         if !dangerous_place[prev] {
-          move(width, height, world, moved, output, pos, prev);
+          move_one(width, height, world, moved, output, pos, prev);
         } else {
           *moved.get_mut(pos) = true;
         }
@@ -1333,14 +1333,14 @@ fn get_random_move(width: uint, height: uint, world: &Vec<Cell>, dangerous_place
   moves[rng.gen_range(0, moves.len())]
 }
 
-fn move_random<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
+fn move_random<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   for &ant_pos in colony.ours_ants.iter() {
     if colony.moved[ant_pos] {
       continue;
     }
     let next_pos = get_random_move(colony.width, colony.height, &colony.world, &colony.dangerous_place, &mut colony.rng, ant_pos);
     if next_pos != ant_pos {
-      move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
+      move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
     } else {
       *colony.moved.get_mut(ant_pos) = true;
     }
@@ -1352,7 +1352,7 @@ fn shuffle(colony: &mut Colony) {
   colony.rng.shuffle(colony.enemies_ants.as_mut_slice());
 }
 
-pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
+pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
   colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
