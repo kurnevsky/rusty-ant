@@ -14,7 +14,7 @@ use input::*;
 
 static TERRITORY_PATH_SIZE_CONST: uint = 5;
 
-static APPROACH_PATH_SIZE_CONST: uint = 2;
+static APPROACH_PATH_SIZE_CONST: uint = 4;
 
 static GATHERING_FOOD_PATH_SIZE: uint = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
 
@@ -186,7 +186,7 @@ fn move_all<T: MutableSeq<Move>>(width: uint, height: uint, world: &mut Vec<Cell
   }
 }
 
-fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint, world: &Vec<Cell>, discovered_area: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ant_pos: uint) -> Option<uint> {
+fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint, world: &Vec<Cell>, discovered_area: &Vec<uint>, dangerous_place: &Vec<bool>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ant_pos: uint) -> Option<uint> {
   let mut n_score = 0u;
   let mut s_score = 0u;
   let mut w_score = 0u;
@@ -195,7 +195,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
   let s_pos = s(width, height, ant_pos);
   let w_pos = w(width, ant_pos);
   let e_pos = e(width, ant_pos);
-  if is_free(world[n_pos]) {
+  if is_free(world[n_pos]) && !dangerous_place[n_pos] {
     simple_wave(width, height, tags, tagged, n_pos, |pos, path_size, prev| {
       if pos == s(width, height, prev) || path_size > manhattan(width, height, n_pos, pos) || manhattan(width, height, n_pos, pos) > min_view_radius_manhattan || world[pos] == Water {
         false
@@ -208,7 +208,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
     }, |_, _, _| { false });
     clear_tags(tags, tagged);
   }
-  if is_free(world[s_pos]) {
+  if is_free(world[s_pos]) && !dangerous_place[s_pos] {
     simple_wave(width, height, tags, tagged, s_pos, |pos, path_size, prev| {
       if pos == n(width, height, prev) || path_size > manhattan(width, height, s_pos, pos) || manhattan(width, height, s_pos, pos) > min_view_radius_manhattan || world[pos] == Water {
         false
@@ -221,7 +221,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
     }, |_, _, _| { false });
     clear_tags(tags, tagged);
   }
-  if is_free(world[w_pos]) {
+  if is_free(world[w_pos]) && !dangerous_place[w_pos] {
     simple_wave(width, height, tags, tagged, w_pos, |pos, path_size, prev| {
       if pos == e(width, prev) || path_size > manhattan(width, height, w_pos, pos) || manhattan(width, height, w_pos, pos) > min_view_radius_manhattan || world[pos] == Water {
         false
@@ -234,7 +234,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
     }, |_, _, _| { false });
     clear_tags(tags, tagged);
   }
-  if is_free(world[e_pos]) {
+  if is_free(world[e_pos])  && !dangerous_place[e_pos] {
     simple_wave(width, height, tags, tagged, e_pos, |pos, path_size, prev| {
       if pos == w(width, prev) || path_size > manhattan(width, height, e_pos, pos) || manhattan(width, height, e_pos, pos) > min_view_radius_manhattan || world[pos] == Water {
         false
@@ -269,7 +269,7 @@ fn discover<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     if colony.moved[pos] {
       continue;
     }
-    match discover_direction(width, height, min_view_radius_manhattan, &colony.world, discovered_area, &mut colony.tags, &mut colony.tagged, pos) {
+    match discover_direction(width, height, min_view_radius_manhattan, &colony.world, discovered_area, &colony.dangerous_place, &mut colony.tags, &mut colony.tagged, pos) {
       Some(next_pos) => {
         simple_wave(width, height, &mut colony.tags, &mut colony.tagged, next_pos, |pos, _, _| {
           if manhattan(width, height, pos, next_pos) <= min_view_radius_manhattan {
@@ -564,7 +564,7 @@ fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint,
 
 fn group_enough(ours_moves_count: uint, enemies_count: uint) -> bool {
   ours_moves_count > 21 ||
-  ours_moves_count > 15 && enemies_count > 6 ||
+  ours_moves_count > 15 && enemies_count > 4 ||
   ours_moves_count > 11 && enemies_count > 7
 }
 
@@ -1310,23 +1310,23 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   }
 }
 
-fn get_random_move(width: uint, height: uint, world: &Vec<Cell>, rng: &mut XorShiftRng, pos: uint) -> uint {
+fn get_random_move(width: uint, height: uint, world: &Vec<Cell>, dangerous_place: &Vec<bool>, rng: &mut XorShiftRng, pos: uint) -> uint {
   let mut moves = Vec::new();
   moves.push(pos);
   let n_pos = n(width, height, pos);
-  if is_free(world[n_pos]) {
+  if is_free(world[n_pos]) && !dangerous_place[n_pos] {
     moves.push(n_pos);
   }
   let w_pos = w(width, pos);
-  if is_free(world[w_pos]) {
+  if is_free(world[w_pos]) && !dangerous_place[w_pos] {
     moves.push(w_pos);
   }
   let s_pos = s(width, height, pos);
-  if is_free(world[s_pos]) {
+  if is_free(world[s_pos]) && !dangerous_place[s_pos] {
     moves.push(s_pos);
   }
   let e_pos = e(width, pos);
-  if is_free(world[e_pos]) {
+  if is_free(world[e_pos]) && !dangerous_place[e_pos] {
     moves.push(e_pos);
   }
   moves[rng.gen_range(0, moves.len())]
@@ -1337,7 +1337,7 @@ fn move_random<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     if colony.moved[ant_pos] {
       continue;
     }
-    let next_pos = get_random_move(colony.width, colony.height, &colony.world, &mut colony.rng, ant_pos);
+    let next_pos = get_random_move(colony.width, colony.height, &colony.world, &colony.dangerous_place, &mut colony.rng, ant_pos);
     if next_pos != ant_pos {
       move(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
     } else {
@@ -1372,7 +1372,7 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colo
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   approach_enemies(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
-  discover(colony, output); //TODO: dangerous_place
+  discover(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   travel(colony, output); //TODO: dangerous_place
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
