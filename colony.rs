@@ -295,6 +295,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
   let territory_path_size = colony.max_view_radius_manhattan + TERRITORY_PATH_SIZE_CONST;
   let moved = &mut colony.moved;
   let tmp = &mut colony.tmp;
+  let dangerous_place = &colony.dangerous_place;
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()).chain(colony.enemies_anthills.iter()), |pos, start_pos, path_size, _| {
     if path_size <= territory_path_size && (*world)[pos] != Water {
       match (*world)[start_pos] {
@@ -318,7 +319,7 @@ fn travel<T: MutableSeq<Move>>(colony: &mut Colony, output: &mut T) {
     let goal = simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, prev| {
       let cell = (*world)[pos];
       let is_column = (*tmp)[prev];
-      if cell == Water || is_column == 1 && ((*moved)[pos] && is_players_ant(cell, 0) || cell == Food) {
+      if cell == Water || is_column == 1 && ((*moved)[pos] && is_players_ant(cell, 0) || cell == Food || dangerous_place[pos]) {
         false
       } else {
         *tmp.get_mut(pos) = if is_players_ant(cell, 0) { is_column } else { 0 };
@@ -1374,7 +1375,7 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Move>>(colony: &mut Colo
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   discover(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
-  travel(colony, output); //TODO: dangerous_place
+  travel(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   move_random(colony, output);
 }
