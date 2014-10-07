@@ -359,7 +359,7 @@ fn attack_anthills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let dangerous_place = &colony.dangerous_place;
   let tmp = &mut colony.tmp;
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_anthills.iter(), |pos, start_pos, path_size, prev| {
-    if dangerous_place[pos] || path_size > ATTACK_ANTHILLS_PATH_SIZE || (*tmp)[start_pos] > ATTACK_ANTHILLS_ANTS_COUNT {
+    if pos != start_pos && dangerous_place[pos] || path_size > ATTACK_ANTHILLS_PATH_SIZE || (*tmp)[start_pos] > ATTACK_ANTHILLS_ANTS_COUNT {
       return false;
     }
     match (*world)[pos] {
@@ -415,7 +415,7 @@ fn gather_food<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     }
   }
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.food.iter(), |pos, start_pos, path_size, prev| {
-    if dangerous_place[pos] || path_size > GATHERING_FOOD_PATH_SIZE {
+    if pos != start_pos && dangerous_place[pos] || path_size > GATHERING_FOOD_PATH_SIZE {
       return false;
     }
     match (*world)[pos] {
