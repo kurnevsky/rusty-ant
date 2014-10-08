@@ -317,7 +317,7 @@ fn travel<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     let goal = simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, prev| {
       let cell = (*world)[pos];
       let is_column = (*tmp)[prev];
-      if cell == Water || is_column == 1 && ((*moved)[pos] && is_players_ant(cell, 0) || cell == Food || dangerous_place[pos] > 0) {
+      if cell == Water || is_column == 1 && ((*moved)[pos] && is_players_ant(cell, 0) || cell == Food || dangerous_place[pos] > 0 && pos != ant_pos) {
         false
       } else {
         *tmp.get_mut(pos) = if is_players_ant(cell, 0) { is_column } else { 0 };
