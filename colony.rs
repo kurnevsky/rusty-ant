@@ -1203,10 +1203,12 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   let height = colony.height;
   let visible_area = &mut colony.visible_area;
   let discovered_area = &mut colony.discovered_area;
+  let world = &mut colony.world;
+  let standing_ants = &mut colony.standing_ants;
   let len = length(width, height);
   for pos in range(0u, len) {
-    *colony.last_world.get_mut(pos) = colony.world[pos];
-    *colony.world.get_mut(pos) = Unknown;
+    *colony.last_world.get_mut(pos) = (*world)[pos];
+    *world.get_mut(pos) = Unknown;
     *colony.moved.get_mut(pos) = false;
     *colony.gathered_food.get_mut(pos) = 0;
     *visible_area.get_mut(pos) += 1;
@@ -1226,16 +1228,16 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
     match i {
       InputWater(point) => {
         let pos = to_pos(width, point);
-        *colony.world.get_mut(pos) = Water;
+        *world.get_mut(pos) = Water;
       },
       InputFood(point) => {
         let pos = to_pos(width, point);
-        *colony.world.get_mut(pos) = Food;
+        *world.get_mut(pos) = Food;
         colony.food.push(pos);
       },
       InputAnthill(point, player) => {
         let pos = to_pos(width, point);
-        *colony.world.get_mut(pos) = if colony.world[pos] == Ant(player) { AnthillWithAnt(player) } else { Anthill(player) };
+        *world.get_mut(pos) = if (*world)[pos] == Ant(player) { AnthillWithAnt(player) } else { Anthill(player) };
         if player == 0 {
           colony.ours_anthills.push(pos);
         } else {
@@ -1247,7 +1249,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
       },
       InputAnt(point, player) => {
         let pos = to_pos(width, point);
-        *colony.world.get_mut(pos) = if colony.world[pos] == Anthill(player) { AnthillWithAnt(player) } else { Ant(player) };
+        *world.get_mut(pos) = if (*world)[pos] == Anthill(player) { AnthillWithAnt(player) } else { Ant(player) };
         if player == 0 {
           colony.ours_ants.push(pos);
         } else {
@@ -1276,19 +1278,19 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   }
   for pos in range(0u, len) {
     if (*visible_area)[pos] == 0 {
-      if colony.world[pos] == Unknown {
-        *colony.world.get_mut(pos) = match colony.last_world[pos] {
+      if (*world)[pos] == Unknown {
+        *world.get_mut(pos) = match colony.last_world[pos] {
           Water => Water,
           _ => Land
         }
       }
-      match colony.world[pos] {
-        Ant(player) if player > 0 => *colony.standing_ants.get_mut(pos) += 1,
-        AnthillWithAnt(player) if player > 0 => *colony.standing_ants.get_mut(pos) += 1,
-        _ => *colony.standing_ants.get_mut(pos) = 0
+      if is_enemy_ant((*world)[pos]) { //TODO: если есть муравей в last_world, а в world нету - сбрасывать счетчик у соседей.
+        *standing_ants.get_mut(pos) += 1;
+      } else {
+        *standing_ants.get_mut(pos) = 0;
       }
     } else {
-      *colony.world.get_mut(pos) = match colony.last_world[pos] {
+      *world.get_mut(pos) = match colony.last_world[pos] {
          Water => {
           *visible_area.get_mut(pos) = 0;
           Water
@@ -1318,7 +1320,20 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
           AnthillWithAnt(player)
         }
       };
-      *colony.standing_ants.get_mut(pos) = 0;
+      *standing_ants.get_mut(pos) = 0;
+    }
+  }
+  for pos in range(0u, len) {
+    if is_enemy_ant(colony.last_world[pos]) != is_enemy_ant((*world)[pos]) {
+      simple_wave(width, height, &mut colony.tags, &mut colony.tagged, pos, |near_pos, _, _| {
+        if is_enemy_ant((*world)[near_pos]) {
+          *standing_ants.get_mut(near_pos) = 1;
+          true
+        } else {
+          near_pos == pos
+        }
+      }, |_, _, _| { false });
+      clear_tags(&mut colony.tags, &mut colony.tagged);
     }
   }
 }

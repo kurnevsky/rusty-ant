@@ -34,6 +34,14 @@ pub fn is_players_ant(cell: Cell, player: uint) -> bool {
   cell == Ant(player) || cell == AnthillWithAnt(player)
 }
 
+pub fn is_enemy_ant(cell: Cell) -> bool {
+  match cell {
+    Ant(player) if player > 0 => true,
+    AnthillWithAnt(player) if player > 0 => true,
+    _ => false
+  }
+}
+
 pub fn is_enemy_anthill(cell: Cell) -> bool {
   match cell {
     Anthill(player) if player > 0 => true,
