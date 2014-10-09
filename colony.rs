@@ -1,6 +1,6 @@
-//TODO: убегание, если в группе один свой муравей.
 //TODO: защита муравейников.
 //TODO: аггрессивность, если игра долго идет, а противник известен только один.
+//TODO: уровни агрессии.
 
 use std::{int, uint};
 use std::collections::*;
@@ -15,6 +15,8 @@ use input::*;
 static TERRITORY_PATH_SIZE_CONST: uint = 5;
 
 static APPROACH_PATH_SIZE_CONST: uint = 4;
+
+static ESCAPE_PATH_SIZE: uint = 8;
 
 static GATHERING_FOOD_PATH_SIZE: uint = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
 
@@ -97,6 +99,7 @@ pub struct Colony {
   fighting: Vec<bool>,
   board: Vec<BoardCell>,
   tmp: Vec<uint>,
+  alone_ants: Vec<uint>,
   tags: Vec<Tag>, // Тэги для волнового алгоритма.
   tagged: Vec<uint>, // Список позиций start_tags и path_tags с ненулевыми значениями.
   ours_ants: Vec<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
@@ -138,6 +141,7 @@ impl Colony {
       fighting: Vec::from_elem(len, false),
       board: Vec::from_elem(len, BoardCell { ant: 0, attack: 0, cycle: 0, dead: false }),
       tmp: Vec::from_elem(len, 0u),
+      alone_ants: Vec::with_capacity(len),
       tags: Vec::from_elem(len, Tag::new()),
       tagged: Vec::with_capacity(len),
       ours_ants: Vec::with_capacity(len),
@@ -1040,6 +1044,14 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
   }
 }
 
+fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, ant_pos: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> bool {
+  let result = simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
+    euclidean(width, height, ant_pos, pos) <= attack_radius2 && world[pos] != Water
+  }, |pos, _, _| { pos != ant_pos && is_players_ant(world[pos], 0) }).is_none();
+  clear_tags(tags, tagged);
+  result
+}
+
 fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let mut ours = Vec::new();
   let mut enemies = Vec::new();
@@ -1054,6 +1066,10 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
     if !enemies.is_empty() {
+      if ours.len() == 1 && !colony.aggressive_place[ours[0]] && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &mut colony.tags, &mut colony.tagged) {
+        colony.alone_ants.push(ours[0]);
+        continue;
+      }
       let mut alpha = int::MIN;
       let mut aggressive = false;
       for &pos in ours.iter() {
@@ -1098,6 +1114,93 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       for &pos in enemies.iter() {
         *colony.fighting.get_mut(pos) = true;
       }
+    }
+  }
+}
+
+fn escape_estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>, estimate_pos: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> int {
+  let mut estimate = 0;
+  simple_wave(width, height, tags, tagged, estimate_pos, |pos, path_size, _| {
+    let cell = world[pos];
+    if path_size > ESCAPE_PATH_SIZE || cell == Water {
+      false
+    } else {
+      estimate += (ESCAPE_PATH_SIZE + 1 - path_size) as int * if is_enemy_ant(cell) { //TODO: Move to constants.
+        -7
+      } else if is_players_ant(cell, 0) {
+        7
+      } else if cell == Food {
+        3
+      } else if dangerous_place[pos] == 0 {
+        1
+      } else {
+        0
+      };
+      true
+    }
+  }, |_, _, _| { false });
+  clear_tags(tags, tagged);
+  estimate
+}
+
+fn escape<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  let mut moves = Vec::with_capacity(5);
+  let mut safe_moves = Vec::with_capacity(5);
+  for &ant_pos in colony.alone_ants.iter() {
+    moves.clear();
+    safe_moves.clear();
+    moves.push(ant_pos);
+    let n_pos = n(colony.width, colony.height, ant_pos);
+    let s_pos = s(colony.width, colony.height, ant_pos);
+    let w_pos = w(colony.width, ant_pos);
+    let e_pos = e(colony.width, ant_pos);
+    if is_free(colony.world[n_pos]) {
+      moves.push(n_pos);
+    }
+    if is_free(colony.world[s_pos]) {
+      moves.push(s_pos);
+    }
+    if is_free(colony.world[w_pos]) {
+      moves.push(w_pos);
+    }
+    if is_free(colony.world[e_pos]) {
+      moves.push(e_pos);
+    }
+    if moves.is_empty() {
+      *colony.moved.get_mut(ant_pos) = true;
+      continue;
+    }
+    for &pos in moves.iter() {
+      if colony.dangerous_place[pos] == 0 {
+        safe_moves.push(pos);
+      }
+    }
+    let mut next_pos;
+    if safe_moves.is_empty() {
+      next_pos = moves[0];
+      let mut min_danger = colony.dangerous_place[moves[0]];
+      for i in range(1u, moves.len()) {
+        let cur_danger = colony.dangerous_place[moves[i]];
+        if cur_danger < min_danger || cur_danger == min_danger && colony.rng.gen() {
+          min_danger = cur_danger;
+          next_pos = moves[i];
+        }
+      }
+    } else {
+      next_pos = safe_moves[0];
+      let mut max_estimate = escape_estimate(colony.width, colony.height, &colony.world, &colony.dangerous_place, safe_moves[0], &mut colony.tags, &mut colony.tagged);
+      for i in range(1u, safe_moves.len()) {
+        let cur_estimate = escape_estimate(colony.width, colony.height, &colony.world, &colony.dangerous_place, safe_moves[i], &mut colony.tags, &mut colony.tagged);
+        if cur_estimate > max_estimate || cur_estimate == max_estimate && colony.rng.gen() {
+          max_estimate = cur_estimate;
+          next_pos = safe_moves[i];
+        }
+      }
+    }
+    if next_pos != ant_pos {
+      move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
+    } else {
+      *colony.moved.get_mut(ant_pos) = true;
     }
   }
 }
@@ -1234,6 +1337,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   colony.enemies_anthills.clear();
   colony.ours_anthills.clear();
   colony.food.clear();
+  colony.alone_ants.clear();
   for &i in *input {
     match i {
       InputWater(point) => {
@@ -1409,6 +1513,8 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   attack(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   approach_enemies(colony, output);
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  escape(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   discover(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
