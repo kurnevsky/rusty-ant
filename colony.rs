@@ -1,6 +1,7 @@
 //TODO: защита муравейников.
 //TODO: аггрессивность, если игра долго идет, а противник известен только один.
 //TODO: уровни агрессии.
+//TODO: динамический подбор констатнт минимакса путем определения производительности на этапе инициализации. Динамическое уменьшение этих констант при таймаутах.
 
 use std::{int, uint};
 use std::collections::*;
@@ -745,7 +746,7 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
   (enemies_dead_count * enemies_dead_estimation_conts) as int - (ours_dead_count * ours_dead_estimation_conts) as int +
   (our_food * our_food_estimation_const) as int - (enemy_food * enemy_food_estimation_const) as int +
   (destroyed_enemy_anthills * destroyed_enemy_anthill_estimation_const) as int - (destroyed_our_anthills * destroyed_our_anthill_estimation_const) as int -
-  (distance_to_enemies * distance_to_enemies_estimation_const) as int
+  (distance_to_enemies * distance_to_enemies_estimation_const) as int //TODO: штраф своему муравью за стояние на муравейнике.
 }
 
 fn get_chain_begin(mut pos: uint, board: &Vec<BoardCell>) -> uint {
