@@ -23,7 +23,11 @@ static GATHERING_FOOD_PATH_SIZE: uint = 30; // Максимальное манх
 
 static ATTACK_ANTHILLS_PATH_SIZE: uint = 20; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
 
+static DEFEND_ANTHILLS_PATH_SIZE: uint = 15;
+
 static ATTACK_ANTHILLS_ANTS_COUNT: uint = 2;
+
+static DEFEND_ANTHILLS_COUNT: uint = 3;
 
 static MINIMAX_CRITICAL_TIME: uint = 100;
 
@@ -103,6 +107,8 @@ pub struct Colony {
   alone_ants: Vec<uint>,
   tags: Vec<Tag>, // Тэги для волнового алгоритма.
   tagged: Vec<uint>, // Список позиций start_tags и path_tags с ненулевыми значениями.
+  tags2: Vec<Tag>,
+  tagged2: Vec<uint>,
   ours_ants: Vec<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
   enemies_ants: Vec<uint>,
   enemies_anthills: Vec<uint>,
@@ -145,6 +151,8 @@ impl Colony {
       alone_ants: Vec::with_capacity(len),
       tags: Vec::from_elem(len, Tag::new()),
       tagged: Vec::with_capacity(len),
+      tags2: Vec::from_elem(len, Tag::new()),
+      tagged2: Vec::with_capacity(len),
       ours_ants: Vec::with_capacity(len),
       enemies_ants: Vec::with_capacity(len),
       enemies_anthills: Vec::with_capacity(len),
@@ -1310,6 +1318,94 @@ fn calculate_dangerous_place(colony: &mut Colony) {
   }
 }
 
+fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  let world = &mut colony.world;
+  let mut defended_anhills = 0u;
+  let mut path = Vec::new();
+  let mut defenders = DList::new();
+  for &anthill_pos in colony.ours_anthills.iter() {
+    let mut defended = false;
+    let mut enemies_ants = DList::new();
+    simple_wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, anthill_pos, |pos, path_size, _| {
+      let cell = (*world)[pos];
+      if path_size > DEFEND_ANTHILLS_PATH_SIZE || cell == Water {
+        false
+      } else {
+        if is_enemy_ant(cell) {
+          enemies_ants.push(pos);
+        }
+        true
+      }
+    }, |_, _, _| { false });
+    for &ant_pos in enemies_ants.iter() {
+      find_inverse_path(&colony.tags, anthill_pos, ant_pos, &mut path);
+      let mut maybe_defender = None;
+      for &pos in path.iter() {
+        if is_players_ant((*world)[pos], 0) && colony.tmp[pos] == 0 {
+          maybe_defender = Some(pos);
+          break;
+        }
+        let n_pos = n(colony.width, colony.height, pos);
+        if is_players_ant((*world)[n_pos], 0) && colony.tmp[n_pos] == 0 {
+          maybe_defender = Some(n_pos);
+          break;
+        }
+        let w_pos = w(colony.width, pos);
+        if is_players_ant((*world)[w_pos], 0) && colony.tmp[w_pos] == 0 {
+          maybe_defender = Some(w_pos);
+          break;
+        }
+        let s_pos = s(colony.width, colony.height, pos);
+        if is_players_ant((*world)[s_pos], 0) && colony.tmp[s_pos] == 0 {
+          maybe_defender = Some(s_pos);
+          break;
+        }
+        let e_pos = e(colony.width, pos);
+        if is_players_ant((*world)[e_pos], 0) && colony.tmp[e_pos] == 0 {
+          maybe_defender = Some(e_pos);
+          break;
+        }
+      }
+      if maybe_defender.is_none() {
+        continue;
+      }
+      defended = true;
+      let defender = maybe_defender.unwrap();
+      defenders.push(defender);
+      *colony.tmp.get_mut(defender) = 1;
+      if colony.moved[defender] {
+        continue;
+      }
+      let center_pos = path[path.len() / 2];
+      if simple_wave(colony.width, colony.height, &mut colony.tags2, &mut colony.tagged2, defender, |pos, _, prev| { //TODO: A*.
+        let cell = (*world)[pos];
+        pos == defender || cell != Water && (prev != defender || is_free(cell))
+      }, |pos, _, _| { pos == center_pos }).is_none() {
+        *colony.moved.get_mut(defender) = true;
+        clear_tags(&mut colony.tags2, &mut colony.tagged2);
+        continue;
+      }
+      let mut defender_path = DList::new();
+      find_path(&colony.tags2, defender, center_pos, &mut defender_path);
+      clear_tags(&mut colony.tags2, &mut colony.tagged2);
+      let next_pos = *defender_path.front().unwrap();
+      move_one(colony.width, colony.height, world, &mut colony.moved, output, defender, next_pos);
+      defenders.push(next_pos);
+      *colony.tmp.get_mut(next_pos) = 1;
+    }
+    clear_tags(&mut colony.tags, &mut colony.tagged);
+    if defended {
+      defended_anhills += 1;
+      if defended_anhills > DEFEND_ANTHILLS_COUNT {
+        break;
+      }
+    }
+  }
+  for &defender in defenders.iter() {
+    *colony.tmp.get_mut(defender) = 0;
+  }
+}
+
 fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) {
   let view_radius2 = colony.view_radius2;
   let min_view_radius_manhattan = colony.min_view_radius_manhattan;
@@ -1512,6 +1608,8 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   gather_food(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   attack(colony, output);
+  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  defend_anhills(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   approach_enemies(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }

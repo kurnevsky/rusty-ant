@@ -98,3 +98,15 @@ pub fn find_path<T: Deque<uint>>(tags: &Vec<Tag>, from: uint, to: uint, path: &m
     pos = tags[pos].prev;
   }
 }
+
+pub fn find_inverse_path<T: MutableSeq<uint>>(tags: &Vec<Tag>, from: uint, to: uint, path: &mut T) {
+  path.clear();
+  if tags[to].start != from {
+    return;
+  }
+  let mut pos = to;
+  while pos != from {
+    pos = tags[pos].prev;
+    path.push(pos);
+  }
+}
