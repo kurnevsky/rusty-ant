@@ -1,9 +1,8 @@
-//TODO: защита муравейников.
 //TODO: аггрессивность, если игра долго идет, а противник известен только один.
 //TODO: уровни агрессии.
 //TODO: динамический подбор констатнт минимакса путем определения производительности на этапе инициализации. Динамическое уменьшение этих констант при таймаутах.
 
-use std::{int, uint};
+use std::{int, uint, cmp};
 use std::collections::*;
 use std::rand::*;
 use coordinates::*;
@@ -25,47 +24,37 @@ static ATTACK_ANTHILLS_PATH_SIZE: uint = 20; // Максимальное ман�
 
 static DEFEND_ANTHILLS_PATH_SIZE: uint = 15;
 
+static DEFENDER_PATH_SIZE: uint = 20;
+
 static ATTACK_ANTHILLS_ANTS_COUNT: uint = 2;
 
-static DEFEND_ANTHILLS_COUNT: uint = 3;
+static DEFEND_ANTHILLS_COUNT: uint = 3; // Максимальное количество атакуемых своих муравейников, которые мы будем защищать.
 
 static MINIMAX_CRITICAL_TIME: uint = 100;
 
-static CRITICAL_TIME: uint = 50;
+static CRITICAL_TIME: uint = 50; // Если на ход осталось времени меньше этого количества миллисекунд, больше ничего не делаем, а только отдаем уже сделанные ходы.
 
-static ENEMIES_DEAD_ESTIMATION_CONST: uint = 4000; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
+static ENEMIES_DEAD_ESTIMATION: &'static [uint] = &[4000, 5000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
 
-static OURS_DEAD_ESTIMATION_CONST: uint = 5000;
+static OURS_DEAD_ESTIMATION: &'static [uint] = &[5000, 3000];
 
-static OUR_FOOD_ESTIMATION_CONST: uint = 2000;
+static OUR_FOOD_ESTIMATION: &'static [uint] = &[2000, 2000];
 
-static ENEMY_FOOD_ESTIMATION_CONST: uint = 1000;
+static ENEMY_FOOD_ESTIMATION: &'static [uint] = &[1000, 1000];
 
-static DESTROYED_ENEMY_ANTHILL_ESTIMATION_CONST: uint = 30000;
+static DESTROYED_ENEMY_ANTHILL_ESTIMATION: &'static [uint] = &[30000, 30000];
 
-static DESTROYED_OUR_ANTHILL_ESTIMATION_CONST: uint = 30000;
+static DESTROYED_OUR_ANTHILL_ESTIMATION: &'static [uint] = &[30000, 30000];
 
-static DISTANCE_TO_ENEMIES_ESTIMATION_CONST: uint = 1;
-
-static ENEMIES_DEAD_AGGRESSIVE_ESTIMATION_CONST: uint = 5000; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции, если группа агрессивна.
-
-static OURS_DEAD_AGGRESSIVE_ESTIMATION_CONST: uint = 3000;
-
-static OUR_FOOD_AGGRESSIVE_ESTIMATION_CONST: uint = 2000;
-
-static ENEMY_FOOD_AGGRESSIVE_ESTIMATION_CONST: uint = 1000;
-
-static DESTROYED_ENEMY_ANTHILL_AGGRESSIVE_ESTIMATION_CONST: uint = 30000;
-
-static DESTROYED_OUR_ANTHILL_AGGRESSIVE_ESTIMATION_CONST: uint = 30000;
-
-static DISTANCE_TO_ENEMIES_AGGRESSIVE_ESTIMATION_CONST: uint = 1;
+static DISTANCE_TO_ENEMIES_ESTIMATION: &'static [uint] = &[1, 1];
 
 static STANDING_ANTS_CONST: uint = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
 
-static NEIGHBORS_FOR_AGGRESSIVE: uint = 6; // Количество соседей (включая диагональных), при котором наш муравей считается агрессивным, а с ним и вся группа.
+static NEIGHBORS_AGGRESSION: &'static [uint] = &[0, 0, 0, 0, 0, 0, 1, 1, 1]; // Уровни агрессии для муравья от числа его соседей.
 
 static OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: uint = 4; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
+
+static OURS_ANTHILLS_AGGRESSION: uint = 1; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
 
 #[deriving(Clone)]
 struct BoardCell {
@@ -99,7 +88,7 @@ pub struct Colony {
   gathered_food: Vec<uint>, // Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1.
   territory: Vec<uint>,
   dangerous_place: Vec<uint>, // Помечаются флагом клетки которые либо под атакой врага, либо которые он может атаковать за один ход.
-  aggressive_place: Vec<bool>,
+  aggressive_place: Vec<uint>,
   groups: Vec<uint>,
   fighting: Vec<bool>,
   board: Vec<BoardCell>,
@@ -143,7 +132,7 @@ impl Colony {
       gathered_food: Vec::from_elem(len, 0u),
       territory: Vec::from_elem(len, 0u),
       dangerous_place: Vec::from_elem(len, 0u),
-      aggressive_place: Vec::from_elem(len, false),
+      aggressive_place: Vec::from_elem(len, 0u),
       groups: Vec::from_elem(len, 0u),
       fighting: Vec::from_elem(len, false),
       board: Vec::from_elem(len, BoardCell { ant: 0, attack: 0, cycle: 0, dead: false }),
@@ -608,7 +597,7 @@ fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, wor
   }
 }
 
-fn is_near_food(width: uint, height: uint, world: &Vec<Cell>, pos: uint) -> bool {
+fn is_near_food(width: uint, height: uint, world: &Vec<Cell>, pos: uint) -> bool { //TODO: spawn_radius2
   if world[n(width, height, pos)] == Food ||
      world[s(width, height, pos)] == Food ||
      world[w(width, pos)] == Food ||
@@ -636,7 +625,7 @@ fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board
   result
 }
 
-fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggressive: bool) -> int { //TODO: для оптимизации юзать dangerous_place, чтобы не считать атаку своих муравьев.
+fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggression: uint) -> int { //TODO: для оптимизации юзать dangerous_place, чтобы не считать атаку своих муравьев.
   let mut other_ours = DList::new();
   let mut ours_dead_count = 0u;
   let mut enemies_dead_count = 0u;
@@ -744,17 +733,10 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
     board.get_mut(ant_pos).attack = 0;
     board.get_mut(ant_pos).dead = false;
   }
-  let enemies_dead_estimation_conts = if aggressive { ENEMIES_DEAD_AGGRESSIVE_ESTIMATION_CONST } else { ENEMIES_DEAD_ESTIMATION_CONST };
-  let ours_dead_estimation_conts = if aggressive { OURS_DEAD_AGGRESSIVE_ESTIMATION_CONST } else { OURS_DEAD_ESTIMATION_CONST };
-  let our_food_estimation_const = if aggressive { OUR_FOOD_AGGRESSIVE_ESTIMATION_CONST } else { OUR_FOOD_ESTIMATION_CONST };
-  let enemy_food_estimation_const = if aggressive { ENEMY_FOOD_AGGRESSIVE_ESTIMATION_CONST } else { ENEMY_FOOD_ESTIMATION_CONST };
-  let destroyed_enemy_anthill_estimation_const = if aggressive { DESTROYED_ENEMY_ANTHILL_AGGRESSIVE_ESTIMATION_CONST } else { DESTROYED_ENEMY_ANTHILL_ESTIMATION_CONST };
-  let destroyed_our_anthill_estimation_const = if aggressive { DESTROYED_OUR_ANTHILL_AGGRESSIVE_ESTIMATION_CONST } else { DESTROYED_OUR_ANTHILL_ESTIMATION_CONST };
-  let distance_to_enemies_estimation_const = if aggressive { DISTANCE_TO_ENEMIES_AGGRESSIVE_ESTIMATION_CONST } else { DISTANCE_TO_ENEMIES_ESTIMATION_CONST };
-  (enemies_dead_count * enemies_dead_estimation_conts) as int - (ours_dead_count * ours_dead_estimation_conts) as int +
-  (our_food * our_food_estimation_const) as int - (enemy_food * enemy_food_estimation_const) as int +
-  (destroyed_enemy_anthills * destroyed_enemy_anthill_estimation_const) as int - (destroyed_our_anthills * destroyed_our_anthill_estimation_const) as int -
-  (distance_to_enemies * distance_to_enemies_estimation_const) as int //TODO: штраф своему муравью за стояние на муравейнике.
+  (enemies_dead_count * ENEMIES_DEAD_ESTIMATION[aggression]) as int - (ours_dead_count * OURS_DEAD_ESTIMATION[aggression]) as int +
+  (our_food * OUR_FOOD_ESTIMATION[aggression]) as int - (enemy_food * ENEMY_FOOD_ESTIMATION[aggression]) as int +
+  (destroyed_enemy_anthills * DESTROYED_ENEMY_ANTHILL_ESTIMATION[aggression]) as int - (destroyed_our_anthills * DESTROYED_OUR_ANTHILL_ESTIMATION[aggression]) as int -
+  (distance_to_enemies * DISTANCE_TO_ENEMIES_ESTIMATION[aggression]) as int //TODO: штраф своему муравью за стояние на муравейнике. штраф своему муравью за стояние на одном месте. близость врага к муравейнику.
 }
 
 fn get_chain_begin(mut pos: uint, board: &Vec<BoardCell>) -> uint {
@@ -963,7 +945,7 @@ fn get_enemy_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, wo
   }
 }
 
-fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: int, start_time: u64, turn_time: uint, aggressive: bool) -> int {
+fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: int, start_time: u64, turn_time: uint, aggression: uint) -> int {
   if idx < enemies.len() {
     let pos = enemies[idx];
     let mut moves = DList::new();
@@ -974,7 +956,7 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
       minimax_moved.push(next_pos);
       board.get_mut(next_pos).ant = ant_owner(world[pos]).unwrap() + 1;
       board.get_mut(next_pos).cycle = pos + 1;
-      let cur_estimate = minimax_min(width, height, idx + 1, minimax_moved, enemies, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, start_time, turn_time, aggressive);
+      let cur_estimate = minimax_min(width, height, idx + 1, minimax_moved, enemies, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, start_time, turn_time, aggression);
       board.get_mut(next_pos).ant = 0;
       board.get_mut(next_pos).cycle = 0;
       minimax_moved.pop();
@@ -987,11 +969,11 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
     }
     min_estimate
   } else {
-    estimate(width, height, world, attack_radius2, minimax_moved, board, tags, tagged, aggressive)
+    estimate(width, height, world, attack_radius2, minimax_moved, board, tags, tagged, aggression)
   }
 }
 
-fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &mut Vec<uint>, world: &Vec<Cell>, dangerous_place: &Vec<uint>, dangerous_place_for_enemies: &mut Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: &mut int, aggressive: bool, start_time: u64, turn_time: uint, best_moves: &mut Vec<uint>) {
+fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &mut Vec<uint>, world: &Vec<Cell>, dangerous_place: &Vec<uint>, dangerous_place_for_enemies: &mut Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: &mut int, aggression: uint, start_time: u64, turn_time: uint, best_moves: &mut Vec<uint>) {
   if idx < ours.len() {
     let pos = ours[idx];
     let mut moves = DList::new();
@@ -1001,7 +983,7 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
       minimax_moved.push(next_pos);
       board.get_mut(next_pos).ant = 1;
       board.get_mut(next_pos).cycle = pos + 1;
-      minimax_max(width, height, idx + 1, minimax_moved, ours, enemies, world, dangerous_place, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, aggressive, start_time, turn_time, best_moves);
+      minimax_max(width, height, idx + 1, minimax_moved, ours, enemies, world, dangerous_place, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, aggression, start_time, turn_time, best_moves);
       board.get_mut(next_pos).ant = 0;
       board.get_mut(next_pos).cycle = 0;
       minimax_moved.pop();
@@ -1031,7 +1013,7 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
         Equal
       }
     });
-    let cur_estimate = minimax_min(width, height, 0, minimax_moved, enemies, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, *alpha, start_time, turn_time, aggressive);
+    let cur_estimate = minimax_min(width, height, 0, minimax_moved, enemies, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, *alpha, start_time, turn_time, aggression);
     for &ant_pos in minimax_moved.iter() {
       simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
         if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
@@ -1075,16 +1057,15 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
     if !enemies.is_empty() {
-      if ours.len() == 1 && !colony.aggressive_place[ours[0]] && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &mut colony.tags, &mut colony.tagged) {
+      if ours.len() == 1 && colony.aggressive_place[ours[0]] == 0 && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &mut colony.tags, &mut colony.tagged) { //TODO: fix colony.aggressive_place[ours[0]] == 0
         colony.alone_ants.push(ours[0]);
         continue;
       }
       let mut alpha = int::MIN;
-      let mut aggressive = false;
+      let mut aggression = 0u;
       for &pos in ours.iter() {
-        if colony.aggressive_place[pos] {
-          aggressive = true;
-          break;
+        if colony.aggressive_place[pos] > aggression {
+          aggression = colony.aggressive_place[pos];
         }
       }
       ours.sort_by(|&pos1, &pos2| {
@@ -1103,7 +1084,7 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       for &pos in ours.iter() {
         remove_ant(&mut colony.world, pos);
       }
-      minimax_max(colony.width, colony.height, 0, &mut minimax_moved, &ours, &mut enemies, &colony.world, &colony.dangerous_place, &mut colony.tmp, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, aggressive, colony.start_time, colony.turn_time, &mut best_moves);
+      minimax_max(colony.width, colony.height, 0, &mut minimax_moved, &ours, &mut enemies, &colony.world, &colony.dangerous_place, &mut colony.tmp, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, aggression, colony.start_time, colony.turn_time, &mut best_moves);
       for &pos in ours.iter() {
         set_ant(&mut colony.world, pos, 0);
       }
@@ -1273,13 +1254,11 @@ fn calculate_aggressive_place(colony: &mut Colony) {
     if colony.world[se(colony.width, colony.height, pos)] == Ant(0) {
       neighbors += 1;
     }
-    if neighbors >= NEIGHBORS_FOR_AGGRESSIVE {
-      *aggressive_place.get_mut(pos) = true;
-    }
+    *aggressive_place.get_mut(pos) = NEIGHBORS_AGGRESSION[neighbors];
   }
   wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_anthills.iter(), |pos, _, path_size, _| {
     if path_size <= OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE {
-      *aggressive_place.get_mut(pos) = true;
+      *aggressive_place.get_mut(pos) = cmp::max((*aggressive_place)[pos], OURS_ANTHILLS_AGGRESSION);
       true
     } else {
       false
@@ -1318,8 +1297,9 @@ fn calculate_dangerous_place(colony: &mut Colony) {
   }
 }
 
-fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //TODO: dangerous_place
   let world = &mut colony.world;
+  let tmp = &mut colony.tmp;
   let mut defended_anhills = 0u;
   let mut path = Vec::new();
   let mut defenders = DList::new();
@@ -1341,30 +1321,37 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       find_inverse_path(&colony.tags, anthill_pos, ant_pos, &mut path);
       let mut maybe_defender = None;
       for &pos in path.iter() {
-        if is_players_ant((*world)[pos], 0) && colony.tmp[pos] == 0 {
+        if is_players_ant((*world)[pos], 0) && (*tmp)[pos] == 0 {
           maybe_defender = Some(pos);
           break;
         }
         let n_pos = n(colony.width, colony.height, pos);
-        if is_players_ant((*world)[n_pos], 0) && colony.tmp[n_pos] == 0 {
+        if is_players_ant((*world)[n_pos], 0) && (*tmp)[n_pos] == 0 {
           maybe_defender = Some(n_pos);
           break;
         }
         let w_pos = w(colony.width, pos);
-        if is_players_ant((*world)[w_pos], 0) && colony.tmp[w_pos] == 0 {
+        if is_players_ant((*world)[w_pos], 0) && (*tmp)[w_pos] == 0 {
           maybe_defender = Some(w_pos);
           break;
         }
         let s_pos = s(colony.width, colony.height, pos);
-        if is_players_ant((*world)[s_pos], 0) && colony.tmp[s_pos] == 0 {
+        if is_players_ant((*world)[s_pos], 0) && (*tmp)[s_pos] == 0 {
           maybe_defender = Some(s_pos);
           break;
         }
         let e_pos = e(colony.width, pos);
-        if is_players_ant((*world)[e_pos], 0) && colony.tmp[e_pos] == 0 {
+        if is_players_ant((*world)[e_pos], 0) && (*tmp)[e_pos] == 0 {
           maybe_defender = Some(e_pos);
           break;
         }
+      }
+      if maybe_defender.is_none() {
+        let three_fourth_pos = path[path.len() * 3 / 4];
+        maybe_defender = simple_wave(colony.width, colony.height, &mut colony.tags2, &mut colony.tagged2, three_fourth_pos, |pos, path_size, _| {
+          path_size <= DEFENDER_PATH_SIZE && (*world)[pos] != Water
+        }, |pos, _, _| { is_players_ant((*world)[pos], 0) && (*tmp)[pos] == 0 });
+        clear_tags(&mut colony.tags2, &mut colony.tagged2);
       }
       if maybe_defender.is_none() {
         continue;
@@ -1372,11 +1359,15 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       defended = true;
       let defender = maybe_defender.unwrap();
       defenders.push(defender);
-      *colony.tmp.get_mut(defender) = 1;
+      *tmp.get_mut(defender) = 1;
       if colony.moved[defender] {
         continue;
       }
       let center_pos = path[path.len() / 2];
+      if defender == center_pos {
+        *colony.moved.get_mut(defender) = true;
+        continue;
+      }
       if simple_wave(colony.width, colony.height, &mut colony.tags2, &mut colony.tagged2, defender, |pos, _, prev| { //TODO: A*.
         let cell = (*world)[pos];
         pos == defender || cell != Water && (prev != defender || is_free(cell))
@@ -1391,7 +1382,7 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       let next_pos = *defender_path.front().unwrap();
       move_one(colony.width, colony.height, world, &mut colony.moved, output, defender, next_pos);
       defenders.push(next_pos);
-      *colony.tmp.get_mut(next_pos) = 1;
+      *tmp.get_mut(next_pos) = 1;
     }
     clear_tags(&mut colony.tags, &mut colony.tagged);
     if defended {
@@ -1402,7 +1393,7 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     }
   }
   for &defender in defenders.iter() {
-    *colony.tmp.get_mut(defender) = 0;
+    *tmp.get_mut(defender) = 0;
   }
 }
 
@@ -1426,7 +1417,7 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
     *colony.territory.get_mut(pos) = 0;
     *colony.groups.get_mut(pos) = 0;
     *colony.dangerous_place.get_mut(pos) = 0;
-    *colony.aggressive_place.get_mut(pos) = false;
+    *colony.aggressive_place.get_mut(pos) = 0;
     *colony.fighting.get_mut(pos) = false;
   }
   colony.ours_ants.clear();
@@ -1588,6 +1579,8 @@ fn move_random<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
 fn shuffle(colony: &mut Colony) {
   colony.rng.shuffle(colony.ours_ants.as_mut_slice());
   colony.rng.shuffle(colony.enemies_ants.as_mut_slice());
+  colony.ours_anthills.sort();
+  colony.enemies_anthills.sort();
 }
 
 pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
