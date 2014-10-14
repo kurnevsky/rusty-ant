@@ -28,7 +28,9 @@ static DEFENDER_PATH_SIZE: uint = 20;
 
 static ATTACK_ANTHILLS_ANTS_COUNT: uint = 2;
 
-static DEFEND_ANTHILLS_COUNT: uint = 3; // Максимальное количество атакуемых своих муравейников, которые мы будем защищать.
+static DANGEROUS_ANTHILLS_COUNT: uint = 3;
+
+static DEFEND_ANTHILLS_COUNT: uint = 2; // Максимальное количество атакуемых своих муравейников, которые мы будем защищать.
 
 static MINIMAX_CRITICAL_TIME: uint = 100;
 
@@ -1298,6 +1300,9 @@ fn calculate_dangerous_place(colony: &mut Colony) {
 }
 
 fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //TODO: dangerous_place
+  if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
+    return;
+  }
   let world = &mut colony.world;
   let tmp = &mut colony.tmp;
   let mut defended_anhills = 0u;
