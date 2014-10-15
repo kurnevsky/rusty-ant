@@ -890,6 +890,7 @@ fn get_our_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, worl
   }
 }
 
+// Рассматриваем также дополнительно сбегающие ходы на наши муравейники. Для своих муравьев такое делать не нужно, так как атака муравейников идет до сражения.
 fn get_enemy_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>, board: &Vec<BoardCell>, standing_ants: &Vec<uint>, moves: &mut T) {
   let mut escape = false;
   if board[pos].ant == 0 {
@@ -909,7 +910,7 @@ fn get_enemy_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, wo
   let chain_begin = get_chain_begin(pos, board);
   if !is_water_or_food(n_cell) && !is_players_ant(n_cell, 0) && board[n_pos].ant == 0 && n_pos != chain_begin {
     if dangerous_place[n_pos] == 0 {
-      if !escape {
+      if !escape || n_cell == Anthill(0) {
         moves.push(n_pos);
       }
       escape = true;
@@ -920,7 +921,7 @@ fn get_enemy_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, wo
   let w_cell = world[w_pos];
   if !is_water_or_food(w_cell) && !is_players_ant(w_cell, 0) && board[w_pos].ant == 0 && w_pos != chain_begin {
     if dangerous_place[w_pos] == 0 {
-      if !escape {
+      if !escape || w_cell == Anthill(0) {
         moves.push(w_pos);
       }
       escape = true;
@@ -931,7 +932,7 @@ fn get_enemy_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, wo
   let s_cell = world[s_pos];
   if !is_water_or_food(s_cell) && !is_players_ant(s_cell, 0) && board[s_pos].ant == 0 && s_pos != chain_begin {
     if dangerous_place[s_pos] == 0 {
-      if !escape {
+      if !escape || s_cell == Anthill(0) {
         moves.push(s_pos);
       }
       escape = true;
@@ -942,7 +943,7 @@ fn get_enemy_moves<T: MutableSeq<uint>>(width: uint, height: uint, pos: uint, wo
   let e_cell = world[e_pos];
   if !is_water_or_food(e_cell) && !is_players_ant(e_cell, 0) && board[e_pos].ant == 0 && e_pos != chain_begin {
     if dangerous_place[e_pos] == 0 {
-      if !escape {
+      if !escape || e_cell == Anthill(0) {
         moves.push(e_pos);
       }
     } else {
