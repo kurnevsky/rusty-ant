@@ -1107,9 +1107,9 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
           }
         }
         move_all(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, &moves);
-      }
-      for &pos in enemies.iter() {
-        *colony.fighting.get_mut(pos) = true;
+        for &pos in enemies.iter() {
+          *colony.fighting.get_mut(pos) = true;
+        }
       }
     }
   }
@@ -1216,7 +1216,7 @@ fn approach_enemies<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     }
     let cell = (*world)[pos];
     if !is_free(cell) {
-      if is_players_ant(cell, 0) {
+      if is_players_ant(cell, 0) && !(*moved)[pos] {
         if dangerous_place[prev] == 0 {
           move_one(width, height, world, moved, output, pos, prev);
         } else {
