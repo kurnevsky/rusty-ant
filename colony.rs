@@ -30,23 +30,23 @@ static DEFEND_ANTHILLS_PATH_SIZE: uint = 15;
 
 static DEFENDER_PATH_SIZE: uint = 20;
 
-static ATTACK_ANTHILLS_ANTS_COUNT: uint = 2;
+static ATTACK_ANTHILLS_ANTS_COUNT: uint = 2; // Максимальное количество наших муравьев, атакующих вражеские муравеники.
 
-static DANGEROUS_ANTHILLS_COUNT: uint = 3;
+static DANGEROUS_ANTHILLS_COUNT: uint = 3; // Если муравейников больше этого количества, не защищаем их вообще.
 
 static DEFEND_ANTHILLS_COUNT: uint = 2; // Максимальное количество атакуемых своих муравейников, которые мы будем защищать.
 
-static MINIMAX_CRITICAL_TIME: uint = 100;
+static MINIMAX_CRITICAL_TIME: uint = 100; // Если на ход осталось времени меньше этого количества миллисекунд, останавливаем минимакс и продолжаем вычислять ходы другими методами.
 
 static CRITICAL_TIME: uint = 50; // Если на ход осталось времени меньше этого количества миллисекунд, больше ничего не делаем, а только отдаем уже сделанные ходы.
 
 static ENEMIES_DEAD_ESTIMATION: &'static [uint] = &[4000, 5000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
 
-static OURS_DEAD_ESTIMATION: &'static [uint] = &[5000, 3000];
+static OURS_DEAD_ESTIMATION: &'static [uint] = &[5000, 3000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
 
-static OUR_FOOD_ESTIMATION: &'static [uint] = &[2000, 2000];
+static OUR_FOOD_ESTIMATION: &'static [uint] = &[2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
 
-static ENEMY_FOOD_ESTIMATION: &'static [uint] = &[1000, 1000];
+static ENEMY_FOOD_ESTIMATION: &'static [uint] = &[1000, 1000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
 
 static DESTROYED_ENEMY_ANTHILL_ESTIMATION: &'static [uint] = &[30000, 30000];
 
@@ -93,7 +93,7 @@ pub struct Colony {
   moved: Vec<bool>, // Помечаются флагом клетки, откуда сделал ход наш муравей, а также куда он сделал ход.
   gathered_food: Vec<uint>, // Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1.
   territory: Vec<uint>,
-  dangerous_place: Vec<uint>, // Помечаются флагом клетки которые либо под атакой врага, либо которые он может атаковать за один ход.
+  dangerous_place: Vec<uint>, // Количество вражеских муравьев, которые могут атаковать клетку на следующем ходу.
   aggressive_place: Vec<uint>,
   groups: Vec<uint>,
   fighting: Vec<bool>,
@@ -102,8 +102,8 @@ pub struct Colony {
   alone_ants: Vec<uint>,
   tags: Vec<Tag>, // Тэги для волнового алгоритма.
   tagged: Vec<uint>, // Список позиций start_tags и path_tags с ненулевыми значениями.
-  tags2: Vec<Tag>,
-  tagged2: Vec<uint>,
+  tags2: Vec<Tag>, // Вторые тэги для волнового алгоритма.
+  tagged2: Vec<uint>, // Список позиций start_tags и path_tags во вторых тэгах с ненулевыми значениями.
   ours_ants: Vec<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
   enemies_ants: Vec<uint>,
   enemies_anthills: Vec<uint>,
@@ -1262,6 +1262,9 @@ fn calculate_aggressive_place(colony: &mut Colony) {
     }
     *aggressive_place.get_mut(pos) = NEIGHBORS_AGGRESSION[neighbors];
   }
+  if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
+    return;
+  }
   wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_anthills.iter(), |pos, _, path_size, _| {
     if path_size <= OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE {
       *aggressive_place.get_mut(pos) = cmp::max((*aggressive_place)[pos], OURS_ANTHILLS_AGGRESSION);
@@ -1406,6 +1409,49 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //
   }
 }
 
+fn get_random_move(width: uint, height: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>, rng: &mut XorShiftRng, pos: uint) -> uint {
+  let mut moves = Vec::new();
+  moves.push(pos);
+  let n_pos = n(width, height, pos);
+  if is_free(world[n_pos]) && dangerous_place[n_pos] == 0 {
+    moves.push(n_pos);
+  }
+  let w_pos = w(width, pos);
+  if is_free(world[w_pos]) && dangerous_place[w_pos] == 0 {
+    moves.push(w_pos);
+  }
+  let s_pos = s(width, height, pos);
+  if is_free(world[s_pos]) && dangerous_place[s_pos] == 0 {
+    moves.push(s_pos);
+  }
+  let e_pos = e(width, pos);
+  if is_free(world[e_pos]) && dangerous_place[e_pos] == 0 {
+    moves.push(e_pos);
+  }
+  moves[rng.gen_range(0, moves.len())]
+}
+
+fn move_random<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  for &ant_pos in colony.ours_ants.iter() {
+    if colony.moved[ant_pos] {
+      continue;
+    }
+    let next_pos = get_random_move(colony.width, colony.height, &colony.world, &colony.dangerous_place, &mut colony.rng, ant_pos);
+    if next_pos != ant_pos {
+      move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
+    } else {
+      *colony.moved.get_mut(ant_pos) = true;
+    }
+  }
+}
+
+fn shuffle(colony: &mut Colony) {
+  colony.rng.shuffle(colony.ours_ants.as_mut_slice());
+  colony.rng.shuffle(colony.enemies_ants.as_mut_slice());
+  colony.ours_anthills.sort();
+  colony.enemies_anthills.sort();
+}
+
 fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) {
   let view_radius2 = colony.view_radius2;
   let min_view_radius_manhattan = colony.min_view_radius_manhattan;
@@ -1547,49 +1593,6 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
       clear_tags(&mut colony.tags, &mut colony.tagged);
     }
   }
-}
-
-fn get_random_move(width: uint, height: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>, rng: &mut XorShiftRng, pos: uint) -> uint {
-  let mut moves = Vec::new();
-  moves.push(pos);
-  let n_pos = n(width, height, pos);
-  if is_free(world[n_pos]) && dangerous_place[n_pos] == 0 {
-    moves.push(n_pos);
-  }
-  let w_pos = w(width, pos);
-  if is_free(world[w_pos]) && dangerous_place[w_pos] == 0 {
-    moves.push(w_pos);
-  }
-  let s_pos = s(width, height, pos);
-  if is_free(world[s_pos]) && dangerous_place[s_pos] == 0 {
-    moves.push(s_pos);
-  }
-  let e_pos = e(width, pos);
-  if is_free(world[e_pos]) && dangerous_place[e_pos] == 0 {
-    moves.push(e_pos);
-  }
-  moves[rng.gen_range(0, moves.len())]
-}
-
-fn move_random<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
-  for &ant_pos in colony.ours_ants.iter() {
-    if colony.moved[ant_pos] {
-      continue;
-    }
-    let next_pos = get_random_move(colony.width, colony.height, &colony.world, &colony.dangerous_place, &mut colony.rng, ant_pos);
-    if next_pos != ant_pos {
-      move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
-    } else {
-      *colony.moved.get_mut(ant_pos) = true;
-    }
-  }
-}
-
-fn shuffle(colony: &mut Colony) {
-  colony.rng.shuffle(colony.ours_ants.as_mut_slice());
-  colony.rng.shuffle(colony.enemies_ants.as_mut_slice());
-  colony.ours_anthills.sort();
-  colony.enemies_anthills.sort();
 }
 
 pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
