@@ -604,7 +604,9 @@ fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, wor
   for &pos in ours_q.iter().chain(enemies.iter()) {
     *groups.get_mut(pos) = 0;
   }
-  log.push(GroupSize(ours_moves_count, enemies_count));
+  if enemies.len() > 0 {
+    log.push(GroupSize(ours_moves_count, enemies_count));
+  }
 }
 
 fn is_near_food(width: uint, height: uint, world: &Vec<Cell>, pos: uint) -> bool { //TODO: spawn_radius2
