@@ -1070,7 +1070,7 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let mut group_index = 1;
   for &pos in colony.ours_ants.iter() {
     if elapsed_time(colony.start_time) + MINIMAX_CRITICAL_TIME > colony.turn_time { return; }
-    if colony.groups[pos] != 0 {
+    if colony.moved[pos] || colony.groups[pos] != 0 {
       continue;
     }
     get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
