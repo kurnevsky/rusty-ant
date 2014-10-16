@@ -1048,7 +1048,7 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
   }
 }
 
-fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, ant_pos: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> bool {
+fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, ant_pos: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> bool { //TODO: проверять, есть ли свои муравьи рядом с противниками, а не со своим муравьем.
   let result = simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
     euclidean(width, height, ant_pos, pos) <= attack_radius2 && world[pos] != Water
   }, |pos, _, _| { pos != ant_pos && is_players_ant(world[pos], 0) }).is_none();
