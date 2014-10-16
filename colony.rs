@@ -1053,6 +1053,14 @@ fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, 
   result
 }
 
+fn log_ants<'r, T: Iterator<&'r uint>>(ants: &mut T) -> Box<DList<uint>> {
+  let mut result = box DList::new();
+  for &ant in *ants {
+    result.push(ant);
+  }
+  result
+}
+
 fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   colony.log.push(Attack);
   let mut ours = Vec::new();
@@ -1097,6 +1105,8 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       for &pos in ours.iter() {
         remove_ant(&mut colony.world, pos);
       }
+      colony.log.push(OursAnts(log_ants(&mut ours.iter())));
+      colony.log.push(EnemiesAnts(log_ants(&mut enemies.iter())));
       minimax_max(colony.width, colony.height, 0, &mut minimax_moved, &ours, &mut enemies, &colony.world, &colony.dangerous_place, &mut colony.tmp, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, aggression, colony.start_time, colony.turn_time, &mut best_moves);
       colony.log.push(Estimate(alpha));
       for &pos in ours.iter() {
