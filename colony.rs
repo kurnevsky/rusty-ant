@@ -1619,6 +1619,7 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
+  colony.log.push(Line);
   colony.log.push(Turn(colony.cur_turn));
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   update_world(colony, input);
@@ -1662,7 +1663,6 @@ pub fn write_log<T: Writer>(colony: &Colony, writer: &mut T) {
   for log_message in colony.log.iter() {
     match *log_message {
       Turn(turn) => {
-        writer.write_line("").ok();
         writer.write_str("Turn number: ").ok();
         writer.write_uint(turn).ok();
         writer.write_line("").ok();
@@ -1681,7 +1681,7 @@ pub fn write_log<T: Writer>(colony: &Colony, writer: &mut T) {
         writer.write_line("").ok();
       },
       Estimate(estimate) => {
-        writer.write_str("Estimate: ").ok();
+        writer.write_str("Estimation: ").ok();
         writer.write_int(estimate).ok();
         writer.write_line("").ok();
       },
@@ -1701,6 +1701,9 @@ pub fn write_log<T: Writer>(colony: &Colony, writer: &mut T) {
         writer.write_str(" our moves; ").ok();
         writer.write_uint(enemies_count).ok();
         writer.write_str(" enemies.").ok();
+        writer.write_line("").ok();
+      },
+      Line => {
         writer.write_line("").ok();
       }
     }

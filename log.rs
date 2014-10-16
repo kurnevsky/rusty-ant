@@ -9,5 +9,6 @@ pub enum LogMessage {
   Estimate(int),
   OursAnts(Box<DList<uint>>),
   EnemiesAnts(Box<DList<uint>>),
-  GroupSize(uint, uint)
+  GroupSize(uint, uint),
+  Line
 }
