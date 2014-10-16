@@ -13,6 +13,7 @@ mod cell;
 mod step;
 mod input;
 mod wave;
+mod log;
 mod colony;
 
 fn read_nonempty_line(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> String {
@@ -260,10 +261,11 @@ fn print_output(writer: &mut io::LineBufferedWriter<io::stdio::StdWriter>, outpu
   writer.write_line("go").ok();
 }
 
-fn final(reader: &mut io::BufferedReader<io::stdio::StdReader>) {
+fn final<T: Writer>(colony: &Colony, reader: &mut io::BufferedReader<io::stdio::StdReader>, writer: &mut T) {
   read_nonempty_line(reader);
   read_nonempty_line(reader);
   turn_info(reader);
+  write_log(colony, writer);
 }
 
 fn main() {
@@ -294,7 +296,7 @@ fn main() {
           }
         }
       }
-      final(&mut stdin)
+      final(&*colony, &mut stdin, &mut stderr);
     },
     None => {
       stderr.write_line("Icorrect input! 4").ok();

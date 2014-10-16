@@ -15,6 +15,7 @@ use wave::*;
 use cell::*;
 use step::*;
 use input::*;
+use log::*;
 
 static TERRITORY_PATH_SIZE_CONST: uint = 5;
 
@@ -108,7 +109,8 @@ pub struct Colony {
   enemies_ants: Vec<uint>,
   enemies_anthills: Vec<uint>,
   ours_anthills: Vec<uint>, // Список клеток с нашими муравейниками (как в видимой области, так и за туманом войны).
-  food: Vec<uint> // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
+  food: Vec<uint>, // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
+  log: DList<LogMessage>
 }
 
 impl Colony {
@@ -152,7 +154,8 @@ impl Colony {
       enemies_ants: Vec::with_capacity(len),
       enemies_anthills: Vec::with_capacity(len),
       ours_anthills: Vec::with_capacity(len),
-      food: Vec::with_capacity(len)
+      food: Vec::with_capacity(len),
+      log: DList::new()
     }
   }
 }
@@ -1051,6 +1054,7 @@ fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, 
 }
 
 fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  colony.log.push(Attack);
   let mut ours = Vec::new();
   let mut enemies = Vec::new();
   let mut minimax_moved = DList::new();
@@ -1068,6 +1072,7 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
         colony.alone_ants.push(ours[0]);
         continue;
       }
+      colony.log.push(Group(group_index));
       let mut alpha = int::MIN;
       let mut aggression = 0u;
       for &pos in ours.iter() {
@@ -1075,6 +1080,7 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
           aggression = colony.aggressive_place[pos];
         }
       }
+      colony.log.push(Aggression(aggression));
       ours.sort_by(|&pos1, &pos2| {
         let pos1_dangerous = colony.dangerous_place[pos1] > 0;
         let pos2_dangerous = colony.dangerous_place[pos2] > 0;
@@ -1092,6 +1098,7 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
         remove_ant(&mut colony.world, pos);
       }
       minimax_max(colony.width, colony.height, 0, &mut minimax_moved, &ours, &mut enemies, &colony.world, &colony.dangerous_place, &mut colony.tmp, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, aggression, colony.start_time, colony.turn_time, &mut best_moves);
+      colony.log.push(Estimate(alpha));
       for &pos in ours.iter() {
         set_ant(&mut colony.world, pos, 0);
       }
@@ -1600,6 +1607,7 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
+  colony.log.push(Turn(colony.cur_turn));
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   update_world(colony, input);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
@@ -1626,4 +1634,54 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   travel(colony, output);
   if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
   move_random(colony, output);
+}
+
+fn write_ants<T: Writer>(width: uint, ants: &DList<uint>, writer: &mut T) {
+  for &pos in ants.iter() {
+    let point = from_pos(width, pos);
+    writer.write_uint(point.y).ok();
+    writer.write_str(":").ok();
+    writer.write_uint(point.x).ok();
+    writer.write_str(" ").ok();
+  }
+}
+
+pub fn write_log<T: Writer>(colony: &Colony, writer: &mut T) {
+  for log_message in colony.log.iter() {
+    match *log_message {
+      Turn(turn) => {
+        writer.write_str("Turn number: ").ok();
+        writer.write_uint(turn).ok();
+        writer.write_line("").ok();
+      },
+      Attack => {
+        writer.write_line("Attack").ok();
+      },
+      Group(group_index) => {
+        writer.write_str("Group number: ").ok();
+        writer.write_uint(group_index).ok();
+        writer.write_line("").ok();
+      },
+      Aggression(aggression) => {
+        writer.write_str("Aggression level: ").ok();
+        writer.write_uint(aggression).ok();
+        writer.write_line("").ok();
+      },
+      Estimate(estimate) => {
+        writer.write_str("Estimate: ").ok();
+        writer.write_int(estimate).ok();
+        writer.write_line("").ok();
+      },
+      OursAnts(ref ants) => {
+        writer.write_str("Ours ants: ").ok();
+        write_ants(colony.width, &**ants, writer);
+        writer.write_line("").ok();
+      },
+      EnemiesAnts(ref ants) => {
+        writer.write_str("Enemies ants: ").ok();
+        write_ants(colony.width, &**ants, writer);
+        writer.write_line("").ok();
+      }
+    }
+  }
 }
