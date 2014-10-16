@@ -578,7 +578,7 @@ fn group_enough(ours_moves_count: uint, enemies_count: uint) -> bool {
   ours_moves_count > 11 && enemies_count > 7
 }
 
-fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, dangerous_place: &Vec<uint>, standing_ants: &Vec<uint>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ours: &mut Vec<uint>, enemies: &mut Vec<uint>, log: &mut DList<LogMessage>) {
+fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, dangerous_place: &Vec<uint>, standing_ants: &Vec<uint>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ours: &mut Vec<uint>, enemies: &mut Vec<uint>) -> uint {
   ours.clear();
   enemies.clear();
   let mut ours_moves_count = 0u;
@@ -604,9 +604,7 @@ fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, wor
   for &pos in ours_q.iter().chain(enemies.iter()) {
     *groups.get_mut(pos) = 0;
   }
-  if enemies.len() > 0 {
-    log.push(GroupSize(ours_moves_count, enemies_count));
-  }
+  ours_moves_count
 }
 
 fn is_near_food(width: uint, height: uint, world: &Vec<Cell>, pos: uint) -> bool { //TODO: spawn_radius2
@@ -1076,7 +1074,7 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     if colony.moved[pos] || colony.groups[pos] != 0 {
       continue;
     }
-    get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies, &mut colony.log);
+    let ours_moves_count = get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
     if !enemies.is_empty() {
       if ours.len() == 1 && colony.aggressive_place[ours[0]] == 0 && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &mut colony.tags, &mut colony.tagged) { //TODO: fix colony.aggressive_place[ours[0]] == 0
@@ -1084,6 +1082,7 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
         continue;
       }
       colony.log.push(Group(group_index));
+      colony.log.push(GroupSize(ours_moves_count, enemies.len()));
       let mut alpha = int::MIN;
       let mut aggression = 0u;
       for &pos in ours.iter() {
@@ -1663,6 +1662,7 @@ pub fn write_log<T: Writer>(colony: &Colony, writer: &mut T) {
   for log_message in colony.log.iter() {
     match *log_message {
       Turn(turn) => {
+        writer.write_line("").ok();
         writer.write_str("Turn number: ").ok();
         writer.write_uint(turn).ok();
         writer.write_line("").ok();
