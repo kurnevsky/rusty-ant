@@ -8,5 +8,6 @@ pub enum LogMessage {
   Aggression(uint),
   Estimate(int),
   OursAnts(Box<DList<uint>>),
-  EnemiesAnts(Box<DList<uint>>)
+  EnemiesAnts(Box<DList<uint>>),
+  GroupSize(uint, uint)
 }
