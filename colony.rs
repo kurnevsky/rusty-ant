@@ -19,7 +19,7 @@ use log::*;
 
 static TERRITORY_PATH_SIZE_CONST: uint = 5;
 
-static APPROACH_PATH_SIZE_CONST: uint = 5;
+static APPROACH_PATH_SIZE_CONST: uint = 6;
 
 static ESCAPE_PATH_SIZE: uint = 8;
 
