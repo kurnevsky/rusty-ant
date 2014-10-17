@@ -56,7 +56,7 @@ static DISTANCE_TO_ENEMIES_ESTIMATION: &'static [uint] = &[1, 1, 1, 1, 1, 1];
 
 static STANDING_ANTS_CONST: uint = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
 
-static NEIGHBORS_AGGRESSION: &'static [uint] = &[0, 0, 1, 1, 2, 3, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
+static NEIGHBORS_AGGRESSION: &'static [uint] = &[0, 0, 1, 1, 1, 2, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
 
 static OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: uint = 4; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
 
