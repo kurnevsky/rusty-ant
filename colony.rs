@@ -1,5 +1,4 @@
 //TODO: аггрессивность, если игра долго идет, а противник известен только один.
-//TODO: уровни агрессии.
 //TODO: динамический подбор констатнт минимакса путем определения производительности на этапе инициализации. Динамическое уменьшение этих констант при таймаутах.
 //TODO: агрессия возле муравейника в случае если враг его не видел.
 //TODO: захват муравейников вместо уничтожения.
@@ -41,27 +40,27 @@ static MINIMAX_CRITICAL_TIME: uint = 100; // Если на ход осталос
 
 static CRITICAL_TIME: uint = 50; // Если на ход осталось времени меньше этого количества миллисекунд, больше ничего не делаем, а только отдаем уже сделанные ходы.
 
-static ENEMIES_DEAD_ESTIMATION: &'static [uint] = &[4000, 5000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
+static ENEMIES_DEAD_ESTIMATION: &'static [uint] = &[3000, 4000, 6000, 9000, 12000, 18000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
 
-static OURS_DEAD_ESTIMATION: &'static [uint] = &[5000, 3000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
+static OURS_DEAD_ESTIMATION: &'static [uint] = &[6000, 6000, 6000, 6000, 6000, 6000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
 
-static OUR_FOOD_ESTIMATION: &'static [uint] = &[2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
+static OUR_FOOD_ESTIMATION: &'static [uint] = &[2000, 2000, 2000, 2000, 2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
 
-static ENEMY_FOOD_ESTIMATION: &'static [uint] = &[1000, 1000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
+static ENEMY_FOOD_ESTIMATION: &'static [uint] = &[1000, 1500, 2000, 3000, 4000, 6000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
 
-static DESTROYED_ENEMY_ANTHILL_ESTIMATION: &'static [uint] = &[30000, 30000];
+static DESTROYED_ENEMY_ANTHILL_ESTIMATION: &'static [uint] = &[50000, 50000, 50000, 50000, 50000, 50000];
 
-static DESTROYED_OUR_ANTHILL_ESTIMATION: &'static [uint] = &[30000, 30000];
+static DESTROYED_OUR_ANTHILL_ESTIMATION: &'static [uint] = &[50000, 50000, 50000, 50000, 50000, 50000];
 
-static DISTANCE_TO_ENEMIES_ESTIMATION: &'static [uint] = &[1, 1];
+static DISTANCE_TO_ENEMIES_ESTIMATION: &'static [uint] = &[1, 1, 1, 1, 1, 1];
 
 static STANDING_ANTS_CONST: uint = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
 
-static NEIGHBORS_AGGRESSION: &'static [uint] = &[0, 0, 0, 0, 0, 0, 1, 1, 1]; // Уровни агрессии для муравья от числа его соседей.
+static NEIGHBORS_AGGRESSION: &'static [uint] = &[0, 0, 1, 1, 2, 3, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
 
 static OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: uint = 4; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
 
-static OURS_ANTHILLS_AGGRESSION: uint = 1; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
+static OURS_ANTHILLS_AGGRESSION: uint = 2; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
 
 #[deriving(Clone)]
 struct BoardCell {
@@ -758,7 +757,7 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
   (enemies_dead_count * ENEMIES_DEAD_ESTIMATION[aggression]) as int - (ours_dead_count * OURS_DEAD_ESTIMATION[aggression]) as int +
   (our_food * OUR_FOOD_ESTIMATION[aggression]) as int - (enemy_food * ENEMY_FOOD_ESTIMATION[aggression]) as int +
   (destroyed_enemy_anthills * DESTROYED_ENEMY_ANTHILL_ESTIMATION[aggression]) as int - (destroyed_our_anthills * DESTROYED_OUR_ANTHILL_ESTIMATION[aggression]) as int -
-  (distance_to_enemies * DISTANCE_TO_ENEMIES_ESTIMATION[aggression]) as int //TODO: штраф своему муравью за стояние на муравейнике. штраф своему муравью за стояние на одном месте. близость врага к муравейнику.
+  (distance_to_enemies * DISTANCE_TO_ENEMIES_ESTIMATION[aggression]) as int //TODO: штраф своему муравью за стояние на муравейнике. штраф своему муравью за стояние на одном месте. близость врага к муравейнику. точное вычисление того, кому достанется еда.
 }
 
 fn get_chain_begin(mut pos: uint, board: &Vec<BoardCell>) -> uint {
