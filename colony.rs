@@ -1065,10 +1065,10 @@ fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, 
     }, |pos, _, _| { pos != ant_pos && is_players_ant(world[pos], 0) });
     clear_tags(tags, tagged);
     if !result.is_none() {
-      return true;
+      return false;
     }
   }
-  false
+  true
 }
 
 fn log_ants<'r, T: Iterator<&'r uint>>(ants: &mut T) -> Box<DList<uint>> {
