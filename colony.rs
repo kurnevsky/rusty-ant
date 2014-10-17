@@ -256,7 +256,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
     }, |_, _, _| { false });
     clear_tags(tags, tagged);
   }
-  if n_score == 0 && s_score == 0 && w_score == 0 && e_score == 0 {
+  if n_score == 0 && s_score == 0 && w_score == 0 && e_score == 0 { //TODO: при равенстве учитывать расстояние до своих муравьев.
     None
   } else if n_score >= s_score && n_score >= w_score && n_score >= e_score {
     Some(n_pos)
