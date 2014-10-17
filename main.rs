@@ -6,6 +6,7 @@ use coordinates::*;
 use step::*;
 use colony::*;
 use input::*;
+use log::*;
 
 mod coordinates;
 mod time;
@@ -16,16 +17,16 @@ mod wave;
 mod log;
 mod colony;
 
-fn read_nonempty_line(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> String {
+fn read_nonempty_line<T: Buffer>(reader: &mut T) -> String {
    loop {
-    let input = reader.read_line().ok().expect("Failed to read line");
+    let input = reader.read_line().ok().expect("Failed to read line!");
     if !input.is_empty() {
       return input;
     }
   }
 }
 
-fn read_turn(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<uint> {
+fn read_turn<T: Buffer>(reader: &mut T) -> Option<uint> {
   let input = read_nonempty_line(reader);
   let split: Vec<&str> = input.as_slice().trim().split(' ').collect();
   if split.len() != 2 || split[0] != "turn" {
@@ -35,7 +36,7 @@ fn read_turn(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<ui
   }
 }
 
-fn init(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<Box<Colony>> {
+fn init<T: Buffer>(reader: &mut T) -> Option<Box<Colony>> {
   let mut load_time = None;
   let mut turn_time = None;
   let mut width = None;
@@ -159,13 +160,12 @@ fn init(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<Box<Col
           None => return None
         }
       },
-      "players" => { },
-      _ => return None
+      _ => { }
     }
   }
 }
 
-fn turn_info(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<Box<DList<Input>>> {
+fn turn_info<T: Buffer>(reader: &mut T) -> Option<Box<DList<Input>>> {
   let mut input = box DList::new();
   loop {
     let string = read_nonempty_line(reader);
@@ -243,7 +243,7 @@ fn turn_info(reader: &mut io::BufferedReader<io::stdio::StdReader>) -> Option<Bo
   }
 }
 
-fn print_output(writer: &mut io::LineBufferedWriter<io::stdio::StdWriter>, output: &mut DList<Step>) {
+fn print_output<T: Writer>(writer: &mut T, output: &mut DList<Step>) {
   for i in output.iter() {
     writer.write_str("o ").ok();
     writer.write_uint(i.point.y).ok();
@@ -261,11 +261,11 @@ fn print_output(writer: &mut io::LineBufferedWriter<io::stdio::StdWriter>, outpu
   writer.write_line("go").ok();
 }
 
-fn final<T: Writer>(colony: &Colony, reader: &mut io::BufferedReader<io::stdio::StdReader>, writer: &mut T) {
+fn final<T1: Buffer, T2: Writer>(colony: &Colony, reader: &mut T1, writer: &mut T2) {
   read_nonempty_line(reader);
   read_nonempty_line(reader);
   turn_info(reader);
-  write_log(colony, writer);
+  write_log(colony.width, &colony.log, writer);
 }
 
 fn main() {
@@ -299,7 +299,7 @@ fn main() {
       final(&*colony, &mut stdin, &mut stderr);
     },
     None => {
-      stderr.write_line("Icorrect input! 4").ok();
+      stderr.write_line("Icorrect input 4!").ok();
       return;
     }
   }

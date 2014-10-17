@@ -71,7 +71,7 @@ struct BoardCell {
   dead: bool // Помечаются флагом погибшие в битве свои и чужие муравьи.
 }
 
-pub struct Colony {
+pub struct Colony { //TODO: make all fields private.
   pub width: uint, // Ширина поля.
   pub height: uint, // Высота поля.
   pub turn_time: uint, // Время на один ход.
@@ -110,7 +110,7 @@ pub struct Colony {
   enemies_anthills: Vec<uint>,
   ours_anthills: Vec<uint>, // Список клеток с нашими муравейниками (как в видимой области, так и за туманом войны).
   food: Vec<uint>, // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
-  log: DList<LogMessage>
+  pub log: DList<LogMessage>
 }
 
 impl Colony {
@@ -270,6 +270,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
 }
 
 fn discover<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  colony.log.push(Discover);
   let width = colony.width;
   let height = colony.height;
   let min_view_radius_manhattan = colony.min_view_radius_manhattan;
@@ -297,6 +298,7 @@ fn discover<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
 }
 
 fn travel<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  colony.log.push(Travel);
   let width = colony.width;
   let height = colony.height;
   let world = &mut colony.world;
@@ -361,12 +363,14 @@ fn travel<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
 }
 
 fn attack_anthills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  colony.log.push(AttackAnthills);
   let width = colony.width;
   let height = colony.height;
   let world = &mut colony.world;
   let moved = &mut colony.moved;
   let dangerous_place = &colony.dangerous_place;
   let tmp = &mut colony.tmp;
+  let log = &mut colony.log;
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_anthills.iter(), |pos, start_pos, path_size, prev| {
     if pos != start_pos && dangerous_place[pos] > 0 || path_size > ATTACK_ANTHILLS_PATH_SIZE || (*tmp)[start_pos] > ATTACK_ANTHILLS_ANTS_COUNT {
       return false;
@@ -378,6 +382,7 @@ fn attack_anthills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
         } else {
           *tmp.get_mut(start_pos) += 1;
           move_one(width, height, world, moved, output, pos, prev);
+          log.push(Goal(pos, start_pos));
           true
         }
       },
@@ -392,12 +397,14 @@ fn attack_anthills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
 }
 
 fn gather_food<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  colony.log.push(GatherFood);
   let width = colony.width;
   let height = colony.height;
   let world = &mut colony.world;
   let gathered_food = &mut colony.gathered_food;
   let moved = &mut colony.moved;
   let dangerous_place = &colony.dangerous_place;
+  let log = &mut colony.log;
   for &pos in colony.ours_ants.iter() {
     if (*moved)[pos] || dangerous_place[pos] > 0 {
       continue;
@@ -406,21 +413,25 @@ fn gather_food<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     if (*world)[n_pos] == Food && (*gathered_food)[n_pos] == 0 {
       *moved.get_mut(pos) = true;
       *gathered_food.get_mut(n_pos) = pos + 1;
+      log.push(Goal(pos, n_pos));
     }
     let s_pos = s(width, height, pos);
     if (*world)[s_pos] == Food && (*gathered_food)[s_pos] == 0 {
       *moved.get_mut(pos) = true;
       *gathered_food.get_mut(s_pos) = pos + 1;
+      log.push(Goal(pos, s_pos));
     }
     let w_pos = w(width, pos);
     if (*world)[w_pos] == Food && (*gathered_food)[w_pos] == 0 {
       *moved.get_mut(pos) = true;
       *gathered_food.get_mut(w_pos) = pos + 1;
+      log.push(Goal(pos, w_pos));
     }
     let e_pos = e(width, pos);
     if (*world)[e_pos] == Food && (*gathered_food)[e_pos] == 0 {
       *moved.get_mut(pos) = true;
       *gathered_food.get_mut(e_pos) = pos + 1;
+      log.push(Goal(pos, e_pos));
     }
   }
   wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.food.iter(), |pos, start_pos, path_size, prev| {
@@ -434,6 +445,7 @@ fn gather_food<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
         } else {
           move_one(width, height, world, moved, output, pos, prev);
           *gathered_food.get_mut(start_pos) = pos + 1;
+          log.push(Goal(pos, start_pos));
           true
         }
       },
@@ -1046,12 +1058,17 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
   }
 }
 
-fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, ant_pos: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> bool { //TODO: проверять, есть ли свои муравьи рядом с противниками, а не со своим муравьем.
-  let result = simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
-    euclidean(width, height, ant_pos, pos) <= attack_radius2 && world[pos] != Water
-  }, |pos, _, _| { pos != ant_pos && is_players_ant(world[pos], 0) }).is_none();
-  clear_tags(tags, tagged);
-  result
+fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, ant_pos: uint, enemies: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> bool {
+  for &enemy_pos in enemies.iter() {
+    let result = simple_wave(width, height, tags, tagged, enemy_pos, |_, _, prev| {
+      euclidean(width, height, enemy_pos, prev) <= attack_radius2
+    }, |pos, _, _| { pos != ant_pos && is_players_ant(world[pos], 0) });
+    clear_tags(tags, tagged);
+    if !result.is_none() {
+      return true;
+    }
+  }
+  false
 }
 
 fn log_ants<'r, T: Iterator<&'r uint>>(ants: &mut T) -> Box<DList<uint>> {
@@ -1077,7 +1094,7 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     let ours_moves_count = get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
     if !enemies.is_empty() {
-      if ours.len() == 1 && colony.aggressive_place[ours[0]] == 0 && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &mut colony.tags, &mut colony.tagged) { //TODO: fix colony.aggressive_place[ours[0]] == 0
+      if ours.len() == 1 && colony.aggressive_place[ours[0]] == 0 && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &enemies, &mut colony.tags, &mut colony.tagged) { //TODO: fix colony.aggressive_place[ours[0]] == 0
         colony.alone_ants.push(ours[0]);
         continue;
       }
@@ -1615,97 +1632,45 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   }
 }
 
+fn is_timeout(start_time: u64, turn_time: uint, log: &mut DList<LogMessage>) -> bool {
+  if elapsed_time(start_time) + CRITICAL_TIME > turn_time {
+    log.push(Timeout);
+    true
+  } else {
+    false
+  }
+}
+
 pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colony, input: &mut T1, output: &mut T2) {
   colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
   colony.log.push(Line);
   colony.log.push(Turn(colony.cur_turn));
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   update_world(colony, input);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   shuffle(colony);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   calculate_dangerous_place(colony);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   calculate_aggressive_place(colony);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   attack_anthills(colony, output);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   gather_food(colony, output);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   attack(colony, output);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   defend_anhills(colony, output);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   approach_enemies(colony, output);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   escape(colony, output);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   discover(colony, output);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   travel(colony, output);
-  if elapsed_time(colony.start_time) + CRITICAL_TIME > colony.turn_time { return; }
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   move_random(colony, output);
-}
-
-fn write_ants<T: Writer>(width: uint, ants: &DList<uint>, writer: &mut T) {
-  for &pos in ants.iter() {
-    let point = from_pos(width, pos);
-    writer.write_uint(point.y).ok();
-    writer.write_str(":").ok();
-    writer.write_uint(point.x).ok();
-    writer.write_str(" ").ok();
-  }
-}
-
-pub fn write_log<T: Writer>(colony: &Colony, writer: &mut T) {
-  for log_message in colony.log.iter() {
-    match *log_message {
-      Turn(turn) => {
-        writer.write_str("Turn number: ").ok();
-        writer.write_uint(turn).ok();
-        writer.write_line("").ok();
-      },
-      Attack => {
-        writer.write_line("Attack").ok();
-      },
-      Group(group_index) => {
-        writer.write_str("Group number: ").ok();
-        writer.write_uint(group_index).ok();
-        writer.write_line("").ok();
-      },
-      Aggression(aggression) => {
-        writer.write_str("Aggression level: ").ok();
-        writer.write_uint(aggression).ok();
-        writer.write_line("").ok();
-      },
-      Estimate(estimate) => {
-        writer.write_str("Estimation: ").ok();
-        writer.write_int(estimate).ok();
-        writer.write_line("").ok();
-      },
-      OursAnts(ref ants) => {
-        writer.write_str("Ours ants: ").ok();
-        write_ants(colony.width, &**ants, writer);
-        writer.write_line("").ok();
-      },
-      EnemiesAnts(ref ants) => {
-        writer.write_str("Enemies ants: ").ok();
-        write_ants(colony.width, &**ants, writer);
-        writer.write_line("").ok();
-      },
-      GroupSize(ours_moves_count, enemies_count) => {
-        writer.write_str("Group size: ").ok();
-        writer.write_uint(ours_moves_count).ok();
-        writer.write_str(" our moves; ").ok();
-        writer.write_uint(enemies_count).ok();
-        writer.write_str(" enemies.").ok();
-        writer.write_line("").ok();
-      },
-      Line => {
-        writer.write_line("").ok();
-      }
-    }
-  }
 }
