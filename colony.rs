@@ -170,7 +170,7 @@ fn set_ant(world: &mut Vec<Cell>, pos: uint, player: uint) {
   *world.get_mut(pos) = if (*world)[pos] == Anthill(player) { AnthillWithAnt(player) } else { Ant(player) };
 }
 
-fn move_one<T: MutableSeq<Step>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, pos: uint, next_pos: uint) {
+fn move_one<T: MutableSeq<Step>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, pos: uint, next_pos: uint) { //TODO: Проверять ход на правильность (повторный ход и прыжки) и в случае ошибки - логировать.
   remove_ant(world, pos);
   *moved.get_mut(pos) = true;
   *world.get_mut(next_pos) = if (*world)[next_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
