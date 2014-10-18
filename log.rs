@@ -18,7 +18,8 @@ pub enum LogMessage {
   Goal(uint, uint),
   //GoalMany,
   //Move
-  Timeout
+  Timeout,
+  MinimaxTimeout
 }
 
 fn write_pos<T: Writer>(width: uint, pos: uint, writer: &mut T) {
@@ -100,6 +101,9 @@ pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T
       },
       Timeout => {
         writer.write_line("  Timeout.").ok();
+      },
+      MinimaxTimeout => {
+        writer.write_line("    Minimax timeout.").ok();
       }
     }
   }
