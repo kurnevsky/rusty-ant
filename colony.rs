@@ -1364,7 +1364,7 @@ fn calculate_dangerous_place(colony: &mut Colony) {
   }
 }
 
-fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //TODO: что делать с муравьями, которые должны убегать?
+fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //TODO: logs.
   if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
     return;
   }
