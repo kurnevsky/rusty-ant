@@ -1645,7 +1645,6 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
-  colony.log.push(Line);
   colony.log.push(Turn(colony.cur_turn));
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   update_world(colony, input);
