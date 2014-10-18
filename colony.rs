@@ -353,6 +353,7 @@ fn travel<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     let mut moves = DList::new();
     for &pos in path.iter() {
       moves.push((path_pos, pos));
+      colony.log.push(Goal(path_pos, goal.unwrap()));
       if !is_players_ant((*world)[pos], 0) {
         break;
       }

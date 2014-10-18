@@ -16,7 +16,6 @@ pub enum LogMessage {
   EnemiesAnts(Box<DList<uint>>),
   GroupSize(uint, uint),
   Goal(uint, uint),
-  //GoalMany,
   Timeout,
   MinimaxTimeout
 }
