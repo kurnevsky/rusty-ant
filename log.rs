@@ -17,7 +17,6 @@ pub enum LogMessage {
   GroupSize(uint, uint),
   Goal(uint, uint),
   //GoalMany,
-  //Move
   Timeout,
   MinimaxTimeout
 }

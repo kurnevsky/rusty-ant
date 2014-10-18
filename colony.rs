@@ -290,6 +290,7 @@ fn discover<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
         }, |_, _, _| { false });
         clear_tags(&mut colony.tags, &mut colony.tagged);
         move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, next_pos);
+        colony.log.push(Goal(pos, next_pos));
       },
       None => { }
     }
