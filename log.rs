@@ -10,6 +10,7 @@ pub enum LogMessage {
   Discover,
   Travel,
   MoveRandom,
+  Escape,
   Group(uint),
   Aggression(uint),
   Estimate(int),
@@ -60,6 +61,9 @@ pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T
       },
       MoveRandom => {
         writer.write_line("  Move random.").ok();
+      },
+      Escape => {
+        writer.write_line("  Escape.").ok();
       },
       Group(group_index) => {
         writer.write_str("    Group number: ").ok();

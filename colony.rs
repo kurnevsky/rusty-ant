@@ -1187,6 +1187,7 @@ fn escape_estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place
 }
 
 fn escape<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  colony.log.push(Escape);
   let mut moves = Vec::with_capacity(5);
   let mut safe_moves = Vec::with_capacity(5);
   for &ant_pos in colony.alone_ants.iter() {
@@ -1211,6 +1212,7 @@ fn escape<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     }
     if moves.is_empty() {
       *colony.moved.get_mut(ant_pos) = true;
+      colony.log.push(Goal(ant_pos, ant_pos));
       continue;
     }
     for &pos in moves.iter() {
@@ -1242,8 +1244,10 @@ fn escape<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     }
     if next_pos != ant_pos {
       move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
+      colony.log.push(Goal(ant_pos, next_pos));
     } else {
       *colony.moved.get_mut(ant_pos) = true;
+      colony.log.push(Goal(ant_pos, ant_pos));
     }
   }
 }
