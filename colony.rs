@@ -1364,7 +1364,8 @@ fn calculate_dangerous_place(colony: &mut Colony) {
   }
 }
 
-fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //TODO: logs.
+fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  colony.log.push(DefendAnthills);
   if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
     return;
   }
@@ -1429,6 +1430,7 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //
       }
       defended = true;
       let defender = maybe_defender.unwrap();
+      colony.log.push(Defender(anthill_pos, ant_pos, defender));
       defenders.push(defender);
       *tmp.get_mut(defender) = 1;
       if colony.moved[defender] {
@@ -1437,14 +1439,16 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //
       let center_pos = path[path.len() / 2];
       if defender == center_pos {
         *colony.moved.get_mut(defender) = true;
+        colony.log.push(Goal(defender, defender));
         continue;
       }
       if simple_wave(colony.width, colony.height, &mut colony.tags2, &mut colony.tagged2, defender, |pos, _, prev| { //TODO: A*.
         let cell = (*world)[pos];
         pos == defender || cell != Water && (prev != defender || is_free(cell) && dangerous_place[pos] == 0)
       }, |pos, _, _| { pos == center_pos }).is_none() {
-        *colony.moved.get_mut(defender) = true;
         clear_tags(&mut colony.tags2, &mut colony.tagged2);
+        *colony.moved.get_mut(defender) = true;
+        colony.log.push(Goal(defender, defender));
         continue;
       }
       let mut defender_path = DList::new();
@@ -1452,6 +1456,7 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //
       clear_tags(&mut colony.tags2, &mut colony.tagged2);
       let next_pos = *defender_path.front().unwrap();
       move_one(colony.width, colony.height, world, &mut colony.moved, output, defender, next_pos);
+      colony.log.push(Goal(defender, center_pos));
       defenders.push(next_pos);
       *tmp.get_mut(next_pos) = 1;
     }

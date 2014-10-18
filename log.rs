@@ -12,6 +12,7 @@ pub enum LogMessage {
   MoveRandom,
   Escape,
   ApproachEnemies,
+  DefendAnthills,
   Group(uint),
   Aggression(uint),
   Estimate(int),
@@ -19,6 +20,7 @@ pub enum LogMessage {
   EnemiesAnts(Box<DList<uint>>),
   GroupSize(uint, uint),
   Goal(uint, uint),
+  Defender(uint, uint, uint),
   Timeout,
   MinimaxTimeout
 }
@@ -69,6 +71,9 @@ pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T
       ApproachEnemies => {
         writer.write_line("  Approach enemies.").ok();
       },
+      DefendAnthills => {
+        writer.write_line("  Defend anthills.").ok();
+      },
       Group(group_index) => {
         writer.write_str("    Group number: ").ok();
         writer.write_uint(group_index).ok();
@@ -107,6 +112,15 @@ pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T
         write_pos(width, ant_pos, writer);
         writer.write_str(" has goal ").ok();
         write_pos(width, goal_pos, writer);
+        writer.write_line(".").ok();
+      },
+      Defender(anthill_pos, enemy_pos, ant_pos) => {
+        writer.write_str("    Ours anthill ").ok();
+        write_pos(width, anthill_pos, writer);
+        writer.write_str(" has defender ").ok();
+        write_pos(width, ant_pos, writer);
+        writer.write_str(" from enemy ").ok();
+        write_pos(width, enemy_pos, writer);
         writer.write_line(".").ok();
       },
       Timeout => {
