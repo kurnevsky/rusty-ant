@@ -1191,6 +1191,9 @@ fn escape<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let mut moves = Vec::with_capacity(5);
   let mut safe_moves = Vec::with_capacity(5);
   for &ant_pos in colony.alone_ants.iter() {
+    if colony.moved[ant_pos] {
+      continue;
+    }
     moves.clear();
     safe_moves.clear();
     moves.push(ant_pos);
@@ -1683,11 +1686,11 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   attack(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
-  defend_anhills(colony, output); //TODO: Logs.
+  escape(colony, output);
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
+  defend_anhills(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   approach_enemies(colony, output);
-  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
-  escape(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   discover(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
