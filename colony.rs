@@ -1265,10 +1265,11 @@ fn approach_enemies<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       if is_players_ant(cell, 0) && !(*moved)[pos] {
         if dangerous_place[prev] == 0 {
           move_one(width, height, world, moved, output, pos, prev);
+          true
         } else {
           *moved.get_mut(pos) = true;
+          false
         }
-        true
       } else {
         false
       }
@@ -1480,6 +1481,7 @@ fn get_random_move(width: uint, height: uint, world: &Vec<Cell>, dangerous_place
 }
 
 fn move_random<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  colony.log.push(MoveRandom);
   for &ant_pos in colony.ours_ants.iter() {
     if colony.moved[ant_pos] {
       continue;
@@ -1487,8 +1489,10 @@ fn move_random<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     let next_pos = get_random_move(colony.width, colony.height, &colony.world, &colony.dangerous_place, &mut colony.rng, ant_pos);
     if next_pos != ant_pos {
       move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
+      colony.log.push(Goal(ant_pos, next_pos));
     } else {
       *colony.moved.get_mut(ant_pos) = true;
+      colony.log.push(Goal(ant_pos, ant_pos));
     }
   }
 }
@@ -1672,11 +1676,11 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   attack(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
-  defend_anhills(colony, output);
+  defend_anhills(colony, output); //TODO: Logs.
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
-  approach_enemies(colony, output);
+  approach_enemies(colony, output); //TODO: Logs.
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
-  escape(colony, output);
+  escape(colony, output); //TODO: Logs.
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   discover(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
