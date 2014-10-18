@@ -11,6 +11,7 @@ pub enum LogMessage {
   Travel,
   MoveRandom,
   Escape,
+  ApproachEnemies,
   Group(uint),
   Aggression(uint),
   Estimate(int),
@@ -64,6 +65,9 @@ pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T
       },
       Escape => {
         writer.write_line("  Escape.").ok();
+      },
+      ApproachEnemies => {
+        writer.write_line("  Approach enemies.").ok();
       },
       Group(group_index) => {
         writer.write_str("    Group number: ").ok();

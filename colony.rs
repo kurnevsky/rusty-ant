@@ -1253,6 +1253,7 @@ fn escape<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
 }
 
 fn approach_enemies<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+  colony.log.push(ApproachEnemies);
   let width = colony.width;
   let height = colony.height;
   let approach_path_size = colony.max_attack_radius_manhattan + APPROACH_PATH_SIZE_CONST;
@@ -1260,13 +1261,15 @@ fn approach_enemies<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let dangerous_place = &colony.dangerous_place;
   let world = &mut colony.world;
   let moved = &mut colony.moved;
-  wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_ants.iter().filter(|&&pos| { fighting[pos] }), |pos, _, path_size, prev| {
+  let log = &mut colony.log;
+  wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.enemies_ants.iter().filter(|&&pos| { fighting[pos] }), |pos, start_pos, path_size, prev| {
     if path_size > approach_path_size {
       return false;
     }
     let cell = (*world)[pos];
     if !is_free(cell) {
       if is_players_ant(cell, 0) && !(*moved)[pos] {
+        log.push(Goal(pos, start_pos));
         if dangerous_place[prev] == 0 {
           move_one(width, height, world, moved, output, pos, prev);
           true
@@ -1358,7 +1361,7 @@ fn calculate_dangerous_place(colony: &mut Colony) {
   }
 }
 
-fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
+fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //TODO: что делать с муравьями, которые должны убегать?
   if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
     return;
   }
@@ -1682,9 +1685,9 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   defend_anhills(colony, output); //TODO: Logs.
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
-  approach_enemies(colony, output); //TODO: Logs.
+  approach_enemies(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
-  escape(colony, output); //TODO: Logs.
+  escape(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   discover(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
