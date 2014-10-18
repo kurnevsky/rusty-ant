@@ -1342,11 +1342,12 @@ fn calculate_dangerous_place(colony: &mut Colony) {
   }
 }
 
-fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //TODO: dangerous_place
+fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
     return;
   }
   let world = &mut colony.world;
+  let dangerous_place = &colony.dangerous_place;
   let tmp = &mut colony.tmp;
   let mut defended_anhills = 0u;
   let mut path = Vec::new();
@@ -1418,7 +1419,7 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) { //
       }
       if simple_wave(colony.width, colony.height, &mut colony.tags2, &mut colony.tagged2, defender, |pos, _, prev| { //TODO: A*.
         let cell = (*world)[pos];
-        pos == defender || cell != Water && (prev != defender || is_free(cell))
+        pos == defender || cell != Water && (prev != defender || is_free(cell) && dangerous_place[pos] == 0)
       }, |pos, _, _| { pos == center_pos }).is_none() {
         *colony.moved.get_mut(defender) = true;
         clear_tags(&mut colony.tags2, &mut colony.tagged2);
