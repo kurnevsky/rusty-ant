@@ -1102,19 +1102,19 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     let ours_moves_count = get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
     if !enemies.is_empty() {
-      if ours.len() == 1 && colony.aggressive_place[ours[0]] == 0 && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &enemies, &mut colony.tags, &mut colony.tagged) { //TODO: fix colony.aggressive_place[ours[0]] == 0
-        colony.alone_ants.push(ours[0]);
-        continue;
-      }
-      colony.log.push(Group(group_index));
-      colony.log.push(GroupSize(ours_moves_count, enemies.len()));
-      let mut alpha = int::MIN;
       let mut aggression = 0u;
       for &pos in ours.iter() {
         if colony.aggressive_place[pos] > aggression {
           aggression = colony.aggressive_place[pos];
         }
       }
+      if ours.len() == 1 && ENEMIES_DEAD_ESTIMATION[aggression] < OURS_DEAD_ESTIMATION[aggression] && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &enemies, &mut colony.tags, &mut colony.tagged) {
+        colony.alone_ants.push(ours[0]);
+        continue;
+      }
+      colony.log.push(Group(group_index));
+      colony.log.push(GroupSize(ours_moves_count, enemies.len()));
+      let mut alpha = int::MIN;
       colony.log.push(Aggression(aggression));
       ours.sort_by(|&pos1, &pos2| {
         let pos1_dangerous = colony.dangerous_place[pos1] > 0;
