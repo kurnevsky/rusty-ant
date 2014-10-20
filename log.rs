@@ -22,7 +22,9 @@ pub enum LogMessage {
   Goal(uint, uint),
   Defender(uint, uint, uint),
   Timeout,
-  MinimaxTimeout
+  MinimaxTimeout,
+  Multitask(uint, uint),
+  Jump(uint, uint)
 }
 
 fn write_pos<T: Writer>(width: uint, pos: uint, writer: &mut T) {
@@ -128,6 +130,20 @@ pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T
       },
       MinimaxTimeout => {
         writer.write_line("    Minimax timeout.").ok();
+      },
+      Multitask(ant_pos, next_pos) => {
+        writer.write_str("    Multitask from ").ok();
+        write_pos(width, ant_pos, writer);
+        writer.write_str(" to ").ok();
+        write_pos(width, next_pos, writer);
+        writer.write_line(".").ok();
+      },
+      Jump(ant_pos, next_pos) => {
+        writer.write_str("    Jump from ").ok();
+        write_pos(width, ant_pos, writer);
+        writer.write_str(" to ").ok();
+        write_pos(width, next_pos, writer);
+        writer.write_line(".").ok();
       }
     }
   }

@@ -265,7 +265,7 @@ fn final<T1: Buffer, T2: Writer>(colony: &Colony, reader: &mut T1, writer: &mut 
   read_nonempty_line(reader);
   read_nonempty_line(reader);
   turn_info(reader);
-  write_log(colony.width, &colony.log, writer);
+  write_log(colony.width(), colony.log(), writer);
 }
 
 fn main() {
@@ -282,7 +282,7 @@ fn main() {
       stdout.write_line("go").ok();
       loop {
         let turn_number = read_turn(&mut stdin);
-        if turn_number != Some(colony.cur_turn + 1) {
+        if turn_number != Some(colony.cur_turn() + 1) {
           break;
         }
         match turn_info(&mut stdin) {

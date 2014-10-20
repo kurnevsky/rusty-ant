@@ -2,8 +2,7 @@
 //TODO: динамический подбор констатнт минимакса путем определения производительности на этапе инициализации. Динамическое уменьшение этих констант при таймаутах.
 //TODO: агрессия возле муравейника в случае если враг его не видел.
 //TODO: захват муравейников вместо уничтожения.
-//TODO: обнуление стоящих муравьев после нашего прогноза на стояние. Либо не считать муравьев стоящими если у них меняется окружение.
-//TODO: в случае безвыходной ситуации ходить на вражеского муравья.
+//TODO: не считать муравьев стоящими если у них меняется окружение.
 
 use std::{int, uint, cmp};
 use std::collections::*;
@@ -70,15 +69,15 @@ struct BoardCell {
   dead: bool // Помечаются флагом погибшие в битве свои и чужие муравьи.
 }
 
-pub struct Colony { //TODO: make all fields private.
-  pub width: uint, // Ширина поля.
-  pub height: uint, // Высота поля.
-  pub turn_time: uint, // Время на один ход.
-  pub turns_count: uint, // Количество ходов в игре.
-  pub view_radius2: uint,
-  pub attack_radius2: uint,
-  pub spawn_radius2: uint,
-  pub cur_turn: uint, // Номер текущего хода.
+pub struct Colony {
+  width: uint, // Ширина поля.
+  height: uint, // Высота поля.
+  turn_time: uint, // Время на один ход.
+  turns_count: uint, // Количество ходов в игре.
+  view_radius2: uint,
+  attack_radius2: uint,
+  spawn_radius2: uint,
+  cur_turn: uint, // Номер текущего хода.
   start_time: u64, // Время начала хода.
   rng: XorShiftRng, // Генератор случайных чисел.
   min_view_radius_manhattan: uint,
@@ -109,7 +108,7 @@ pub struct Colony { //TODO: make all fields private.
   enemies_anthills: Vec<uint>,
   ours_anthills: Vec<uint>, // Список клеток с нашими муравейниками (как в видимой области, так и за туманом войны).
   food: Vec<uint>, // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
-  pub log: DList<LogMessage>
+  log: DList<LogMessage>
 }
 
 impl Colony {
@@ -157,6 +156,18 @@ impl Colony {
       log: DList::new()
     }
   }
+  pub fn log(&self) -> &DList<LogMessage> {
+    &self.log
+  }
+  pub fn width(&self) -> uint {
+    self.width
+  }
+  pub fn height(&self) -> uint {
+    self.height
+  }
+  pub fn cur_turn(&self) -> uint {
+    self.cur_turn
+  }
 }
 
 fn remove_ant(world: &mut Vec<Cell>, pos: uint) {
@@ -170,27 +181,41 @@ fn set_ant(world: &mut Vec<Cell>, pos: uint, player: uint) {
   *world.get_mut(pos) = if (*world)[pos] == Anthill(player) { AnthillWithAnt(player) } else { Ant(player) };
 }
 
-fn move_one<T: MutableSeq<Step>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, pos: uint, next_pos: uint) { //TODO: Проверять ход на правильность (повторный ход и прыжки) и в случае ошибки - логировать.
+fn move_one<T: MutableSeq<Step>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, pos: uint, next_pos: uint, log: &mut DList<LogMessage>) {
+  let direction = to_direction(width, height, pos, next_pos);
+  if direction.is_none() {
+    log.push(Jump(pos, next_pos));
+    return;
+  }
+  if !is_players_ant((*world)[pos], 0) {
+    log.push(Multitask(pos, next_pos));
+    return;
+  }
   remove_ant(world, pos);
   *moved.get_mut(pos) = true;
-  *world.get_mut(next_pos) = if (*world)[next_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
+  set_ant(world, next_pos, 0);
   *moved.get_mut(next_pos) = true;
-  output.push(Step { point: from_pos(width, pos), direction: to_direction(width, height, pos, next_pos).unwrap() })
+  output.push(Step { point: from_pos(width, pos), direction: direction.unwrap() })
 }
 
-fn move_all<T: MutableSeq<Step>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, moves: &DList<(uint, uint)>) {
-  for &(pos, _) in moves.iter() {
-    *world.get_mut(pos) = match (*world)[pos] {
-      AnthillWithAnt(0) => Anthill(0),
-      _ => Land
-    };
+fn move_all<T: MutableSeq<Step>>(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut T, moves: &DList<(uint, uint)>, log: &mut DList<LogMessage>) {
+  for &(pos, next_pos) in moves.iter() {
+    if !is_players_ant((*world)[pos], 0) {
+      log.push(Multitask(pos, next_pos));
+      continue;
+    }
+    remove_ant(world, pos);
     *moved.get_mut(pos) = true;
   }
   for &(pos, next_pos) in moves.iter() {
+    let direction = to_direction(width, height, pos, next_pos);
+    if direction.is_none() {
+      log.push(Jump(pos, next_pos));
+      continue;
+    }
     set_ant(world, next_pos, 0);
-    *world.get_mut(next_pos) = if (*world)[next_pos] == Anthill(0) { AnthillWithAnt(0) } else { Ant(0) };
     *moved.get_mut(next_pos) = true;
-    output.push(Step { point: from_pos(width, pos), direction: to_direction(width, height, pos, next_pos).unwrap() });
+    output.push(Step { point: from_pos(width, pos), direction: direction.unwrap() });
   }
 }
 
@@ -289,7 +314,7 @@ fn discover<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
           }
         }, |_, _, _| { false });
         clear_tags(&mut colony.tags, &mut colony.tagged);
-        move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, next_pos);
+        move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, pos, next_pos, &mut colony.log);
         colony.log.push(Goal(pos, next_pos));
       },
       None => { }
@@ -359,7 +384,7 @@ fn travel<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       }
       path_pos = pos;
     }
-    move_all(width, height, world, moved, output, &moves);
+    move_all(width, height, world, moved, output, &moves, &mut colony.log);
   }
 }
 
@@ -382,7 +407,7 @@ fn attack_anthills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
           false
         } else {
           *tmp.get_mut(start_pos) += 1;
-          move_one(width, height, world, moved, output, pos, prev);
+          move_one(width, height, world, moved, output, pos, prev, log);
           log.push(Goal(pos, start_pos));
           true
         }
@@ -444,7 +469,7 @@ fn gather_food<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
         if pos != start_pos && !is_free((*world)[prev]) {
           false
         } else {
-          move_one(width, height, world, moved, output, pos, prev);
+          move_one(width, height, world, moved, output, pos, prev, log);
           *gathered_food.get_mut(start_pos) = pos + 1;
           log.push(Goal(pos, start_pos));
           true
@@ -1152,7 +1177,7 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
             moves.push((pos, next_pos));
           }
         }
-        move_all(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, &moves);
+        move_all(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, &moves, &mut colony.log);
         for &pos in enemies.iter() {
           *colony.fighting.get_mut(pos) = true;
         }
@@ -1246,7 +1271,7 @@ fn escape<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       }
     }
     if next_pos != ant_pos {
-      move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
+      move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos, &mut colony.log);
       colony.log.push(Goal(ant_pos, next_pos));
     } else {
       *colony.moved.get_mut(ant_pos) = true;
@@ -1274,7 +1299,7 @@ fn approach_enemies<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       if is_players_ant(cell, 0) && !(*moved)[pos] {
         log.push(Goal(pos, start_pos));
         if dangerous_place[prev] == 0 {
-          move_one(width, height, world, moved, output, pos, prev);
+          move_one(width, height, world, moved, output, pos, prev, log);
           true
         } else {
           *moved.get_mut(pos) = true;
@@ -1455,7 +1480,7 @@ fn defend_anhills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       find_path(&colony.tags2, defender, center_pos, &mut defender_path);
       clear_tags(&mut colony.tags2, &mut colony.tagged2);
       let next_pos = *defender_path.front().unwrap();
-      move_one(colony.width, colony.height, world, &mut colony.moved, output, defender, next_pos);
+      move_one(colony.width, colony.height, world, &mut colony.moved, output, defender, next_pos, &mut colony.log);
       colony.log.push(Goal(defender, center_pos));
       defenders.push(next_pos);
       *tmp.get_mut(next_pos) = 1;
@@ -1503,7 +1528,7 @@ fn move_random<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     }
     let next_pos = get_random_move(colony.width, colony.height, &colony.world, &colony.dangerous_place, &mut colony.rng, ant_pos);
     if next_pos != ant_pos {
-      move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos);
+      move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos, &mut colony.log);
       colony.log.push(Goal(ant_pos, next_pos));
     } else {
       *colony.moved.get_mut(ant_pos) = true;
