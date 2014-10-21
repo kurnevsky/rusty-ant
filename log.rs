@@ -17,6 +17,7 @@ pub enum LogMessage {
   Aggression(uint),
   Estimate(int),
   OursAnts(Box<DList<uint>>),
+  OtherOursAnts(Box<DList<uint>>),
   EnemiesAnts(Box<DList<uint>>),
   GroupSize(uint, uint),
   Goal(uint, uint),
@@ -93,6 +94,11 @@ pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T
       },
       OursAnts(ref ants) => {
         writer.write_str("    Ours ants: ").ok();
+        write_ants(width, &**ants, writer);
+        writer.write_line("").ok();
+      },
+      OtherOursAnts(ref ants) => {
+        writer.write_str("    Other ours ants: ").ok();
         write_ants(width, &**ants, writer);
         writer.write_line("").ok();
       },

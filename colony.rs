@@ -673,8 +673,7 @@ fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board
   result
 }
 
-fn estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<uint>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggression: uint) -> int { //TODO: dangerous_place_for_enemies должно содержать атаки всех наших муравьев, а не только просчитываемых. Это позволит избавиться от волны от other_ours. В attack динамически удаляем просчитываемых, а после просчета добавляем на новое место. От всех врагов с самого начала найти other_ours?
-  let mut other_ours = DList::new();
+fn estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<uint>, attack_radius2: uint, ants: &DList<uint>, other_ours: &Vec<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggression: uint) -> int {
   let mut ours_dead_count = 0u;
   let mut enemies_dead_count = 0u;
   let mut our_food = 0u;
@@ -692,30 +691,10 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place_for_en
       break;
     }
     board.get_mut(ant_pos).attack += dangerous_place_for_enemies[ant_pos];
-    simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
+    simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| { //TODO: Move to minimax_min
       if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
         let board_cell = board.get_mut(pos);
-        if board_cell.ant != 0 {
-          if board_cell.ant != ant_number {
-            board_cell.attack += 1;
-          }
-        } else if ant_number != 1 && is_players_ant(world[pos], 0) {
-          board_cell.ant = 1;
-          other_ours.push(pos);
-          board_cell.attack += 1;
-        }
-        true
-      } else {
-        false
-      }
-    }, |_, _, _| { false });
-    clear_tags(tags, tagged);
-  }
-  for &ant_pos in other_ours.iter() {
-    simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
-      if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
-        let board_cell = board.get_mut(pos);
-        if board_cell.ant > 1 {
+        if board_cell.ant != 0 && board_cell.ant != ant_number {
           board_cell.attack += 1;
         }
         true
@@ -776,12 +755,7 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place_for_en
       }
     }
   }
-  for &ant_pos in ants.iter() {
-    board.get_mut(ant_pos).attack = 0;
-    board.get_mut(ant_pos).dead = false;
-  }
-  for &ant_pos in other_ours.iter() {
-    board.get_mut(ant_pos).ant = 0;
+  for &ant_pos in ants.iter().chain(other_ours.iter()) {
     board.get_mut(ant_pos).attack = 0;
     board.get_mut(ant_pos).dead = false;
   }
@@ -1007,7 +981,7 @@ fn is_minimax_timeout(start_time: u64, turn_time: uint, log: &mut DList<LogMessa
   }
 }
 
-fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, enemies: &Vec<uint>, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: int, start_time: u64, turn_time: uint, aggression: uint, log: &mut DList<LogMessage>) -> int {
+fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, enemies: &Vec<uint>, other_ours: &Vec<uint>, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: int, start_time: u64, turn_time: uint, aggression: uint, log: &mut DList<LogMessage>) -> int {
   if idx < enemies.len() {
     let pos = enemies[idx];
     let mut moves = DList::new();
@@ -1018,7 +992,7 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
       minimax_moved.push(next_pos);
       board.get_mut(next_pos).ant = ant_owner(world[pos]).unwrap() + 1;
       board.get_mut(next_pos).cycle = pos + 1;
-      let cur_estimate = minimax_min(width, height, idx + 1, minimax_moved, enemies, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, start_time, turn_time, aggression, log);
+      let cur_estimate = minimax_min(width, height, idx + 1, minimax_moved, enemies, other_ours, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, start_time, turn_time, aggression, log);
       board.get_mut(next_pos).ant = 0;
       board.get_mut(next_pos).cycle = 0;
       minimax_moved.pop();
@@ -1031,11 +1005,11 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
     }
     min_estimate
   } else {
-    estimate(width, height, world, dangerous_place_for_enemies, attack_radius2, minimax_moved, board, tags, tagged, aggression)
+    estimate(width, height, world, dangerous_place_for_enemies, attack_radius2, minimax_moved, other_ours, board, tags, tagged, aggression)
   }
 }
 
-fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &mut Vec<uint>, world: &Vec<Cell>, dangerous_place: &Vec<uint>, dangerous_place_for_enemies: &mut Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: &mut int, aggression: uint, start_time: u64, turn_time: uint, best_moves: &mut Vec<uint>, log: &mut DList<LogMessage>) {
+fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &mut Vec<uint>, other_ours: &Vec<uint>, world: &Vec<Cell>, dangerous_place: &Vec<uint>, dangerous_place_for_enemies: &mut Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: &mut int, aggression: uint, start_time: u64, turn_time: uint, best_moves: &mut Vec<uint>, log: &mut DList<LogMessage>) {
   if idx < ours.len() {
     let pos = ours[idx];
     let mut moves = DList::new();
@@ -1045,23 +1019,14 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
       minimax_moved.push(next_pos);
       board.get_mut(next_pos).ant = 1;
       board.get_mut(next_pos).cycle = pos + 1;
-      minimax_max(width, height, idx + 1, minimax_moved, ours, enemies, world, dangerous_place, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, aggression, start_time, turn_time, best_moves, log);
+      add_attack(width, height, attack_radius2, next_pos, dangerous_place_for_enemies, tags, tagged);
+      minimax_max(width, height, idx + 1, minimax_moved, ours, enemies, other_ours, world, dangerous_place, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, aggression, start_time, turn_time, best_moves, log);
+      remove_attack(width, height, attack_radius2, next_pos, dangerous_place_for_enemies, tags, tagged);
       board.get_mut(next_pos).ant = 0;
       board.get_mut(next_pos).cycle = 0;
       minimax_moved.pop();
     }
   } else {
-    for &ant_pos in minimax_moved.iter() {
-      simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
-        if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
-          *dangerous_place_for_enemies.get_mut(pos) += 1;
-          true
-        } else {
-          false
-        }
-      }, |_, _, _| { false });
-      clear_tags(tags, tagged);
-    }
     enemies.sort_by(|&pos1, &pos2| {
       let pos1_dangerous = (*dangerous_place_for_enemies)[pos1] > 0;
       let pos2_dangerous = (*dangerous_place_for_enemies)[pos2] > 0;
@@ -1075,19 +1040,8 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
         Equal
       }
     });
-    let cur_estimate = minimax_min(width, height, 0, minimax_moved, enemies, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, *alpha, start_time, turn_time, aggression, log);
-    for &ant_pos in minimax_moved.iter() {
-      simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
-        if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
-          *dangerous_place_for_enemies.get_mut(pos) = 0;
-          true
-        } else {
-          false
-        }
-      }, |_, _, _| { false });
-      clear_tags(tags, tagged);
-    }
-    if cur_estimate > *alpha {
+    let cur_estimate = minimax_min(width, height, 0, minimax_moved, enemies, other_ours, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, *alpha, start_time, turn_time, aggression, log);
+    if cur_estimate > *alpha { //TODO: среди всех одинаковых выбирать ту оценку, которая больше при условии, что враг останется на месте.
       *alpha = cur_estimate;
       best_moves.clear();
       for &pos in minimax_moved.iter() {
@@ -1118,9 +1072,55 @@ fn log_ants<'r, T: Iterator<&'r uint>>(ants: &mut T) -> Box<DList<uint>> {
   result
 }
 
+fn get_other_ours(width: uint, height: uint, world: &Vec<Cell>, groups: &Vec<uint>, tmp: &mut Vec<uint>, group_index: uint, attack_radius2: uint, enemies: &Vec<uint>, other_ours: &mut Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) {
+  other_ours.clear();
+  for &enemy_pos in enemies.iter() {
+    simple_wave(width, height, tags, tagged, enemy_pos, |pos, _, prev| {
+      if euclidean(width, height, enemy_pos, prev) <= attack_radius2 {
+        if is_players_ant(world[pos], 0) && groups[pos] != group_index && (*tmp)[pos] == 0 {
+          *tmp.get_mut(pos) = 1;
+          other_ours.push(pos);
+        }
+        true
+      } else {
+        false
+      }
+    }, |_, _, _| { false });
+    clear_tags(tags, tagged);
+  }
+  for &ant_pos in other_ours.iter() {
+    *tmp.get_mut(ant_pos) = 0;
+  }
+}
+
+fn add_attack(width: uint, height: uint, attack_radius2: uint, ant_pos: uint, attack_place: &mut Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) {
+  simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
+    if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
+      *attack_place.get_mut(pos) += 1;
+      true
+    } else {
+      false
+    }
+  }, |_, _, _| { false });
+  clear_tags(tags, tagged);
+}
+
+fn remove_attack(width: uint, height: uint, attack_radius2: uint, ant_pos: uint, attack_place: &mut Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) {
+  simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
+    if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
+      *attack_place.get_mut(pos) -= 1;
+      true
+    } else {
+      false
+    }
+  }, |_, _, _| { false });
+  clear_tags(tags, tagged);
+}
+
 fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   colony.log.push(Attack);
   let mut ours = Vec::new();
+  let mut other_ours = Vec::new();
   let mut enemies = Vec::new();
   let mut minimax_moved = DList::new();
   let mut best_moves = Vec::new();
@@ -1165,8 +1165,18 @@ fn attack<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
       }
       colony.log.push(OursAnts(log_ants(&mut ours.iter())));
       colony.log.push(EnemiesAnts(log_ants(&mut enemies.iter())));
-      minimax_max(colony.width, colony.height, 0, &mut minimax_moved, &ours, &mut enemies, &colony.world, &colony.dangerous_place, &mut colony.tmp, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, aggression, colony.start_time, colony.turn_time, &mut best_moves, &mut colony.log);
+      get_other_ours(colony.width, colony.height, &colony.world, &colony.groups, &mut colony.tmp, group_index, colony.attack_radius2, &enemies, &mut other_ours, &mut colony.tags, &mut colony.tagged);
+      colony.log.push(OtherOursAnts(log_ants(&mut other_ours.iter())));
+      for &pos in other_ours.iter() {
+        add_attack(colony.width, colony.height, colony.attack_radius2, pos, &mut colony.tmp, &mut colony.tags, &mut colony.tagged);
+        colony.board.get_mut(pos).ant = 1;
+      }
+      minimax_max(colony.width, colony.height, 0, &mut minimax_moved, &ours, &mut enemies, &other_ours, &colony.world, &colony.dangerous_place, &mut colony.tmp, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, aggression, colony.start_time, colony.turn_time, &mut best_moves, &mut colony.log);
       colony.log.push(Estimate(alpha));
+      for &pos in other_ours.iter() {
+        remove_attack(colony.width, colony.height, colony.attack_radius2, pos, &mut colony.tmp, &mut colony.tags, &mut colony.tagged);
+        colony.board.get_mut(pos).ant = 0;
+      }
       for &pos in ours.iter() {
         set_ant(&mut colony.world, pos, 0);
       }
