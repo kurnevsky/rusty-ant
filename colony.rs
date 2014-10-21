@@ -673,7 +673,7 @@ fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board
   result
 }
 
-fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggression: uint) -> int { //TODO: для оптимизации юзать dangerous_place, чтобы не считать атаку своих муравьев.
+fn estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<uint>, attack_radius2: uint, ants: &DList<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggression: uint) -> int { //TODO: dangerous_place_for_enemies должно содержать атаки всех наших муравьев, а не только просчитываемых. Это позволит избавиться от волны от other_ours. В attack динамически удаляем просчитываемых, а после просчета добавляем на новое место. От всех врагов с самого начала найти other_ours?
   let mut other_ours = DList::new();
   let mut ours_dead_count = 0u;
   let mut enemies_dead_count = 0u;
@@ -682,12 +682,16 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
   let mut destroyed_enemy_anthills = 0u;
   let mut destroyed_our_anthills = 0u;
   let mut distance_to_enemies = 0u;
-  for &ant_pos in ants.iter() {
+  for &ant_pos in ants.iter().rev() {
     let ant_board_cell = (*board)[ant_pos];
-    if ant_board_cell.ant == 0 {
+    let ant_number = ant_board_cell.ant;
+    if ant_number == 0 {
       continue;
     }
-    let ant_number = ant_board_cell.ant;
+    if ant_number == 1 {
+      break;
+    }
+    board.get_mut(ant_pos).attack += dangerous_place_for_enemies[ant_pos];
     simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
       if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
         let board_cell = board.get_mut(pos);
@@ -1027,7 +1031,7 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
     }
     min_estimate
   } else {
-    estimate(width, height, world, attack_radius2, minimax_moved, board, tags, tagged, aggression)
+    estimate(width, height, world, dangerous_place_for_enemies, attack_radius2, minimax_moved, board, tags, tagged, aggression)
   }
 }
 
