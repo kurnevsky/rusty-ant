@@ -673,7 +673,7 @@ fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board
   result
 }
 
-fn estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<uint>, attack_radius2: uint, ants: &DList<uint>, other_ours: &Vec<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggression: uint) -> int {
+fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, other_ours: &Vec<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggression: uint) -> int {
   let mut ours_dead_count = 0u;
   let mut enemies_dead_count = 0u;
   let mut our_food = 0u;
@@ -681,29 +681,6 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place_for_en
   let mut destroyed_enemy_anthills = 0u;
   let mut destroyed_our_anthills = 0u;
   let mut distance_to_enemies = 0u;
-  for &ant_pos in ants.iter().rev() {
-    let ant_board_cell = (*board)[ant_pos];
-    let ant_number = ant_board_cell.ant;
-    if ant_number == 0 {
-      continue;
-    }
-    if ant_number == 1 {
-      break;
-    }
-    board.get_mut(ant_pos).attack += dangerous_place_for_enemies[ant_pos];
-    simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| { //TODO: Move to minimax_min
-      if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
-        let board_cell = board.get_mut(pos);
-        if board_cell.ant != 0 && board_cell.ant != ant_number {
-          board_cell.attack += 1;
-        }
-        true
-      } else {
-        false
-      }
-    }, |_, _, _| { false });
-    clear_tags(tags, tagged);
-  }
   for &ant_pos in ants.iter().chain(other_ours.iter()) {
     if (*board)[ant_pos].ant == 0 {
       continue;
@@ -756,7 +733,6 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place_for_en
     }
   }
   for &ant_pos in ants.iter().chain(other_ours.iter()) {
-    board.get_mut(ant_pos).attack = 0;
     board.get_mut(ant_pos).dead = false;
   }
   (enemies_dead_count * ENEMIES_DEAD_ESTIMATION[aggression]) as int - (ours_dead_count * OURS_DEAD_ESTIMATION[aggression]) as int +
@@ -990,9 +966,38 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
     for &next_pos in moves.iter() {
       if is_minimax_timeout(start_time, turn_time, log) { return int::MIN; }
       minimax_moved.push(next_pos);
-      board.get_mut(next_pos).ant = ant_owner(world[pos]).unwrap() + 1;
+      let ant_number = ant_owner(world[pos]).unwrap() + 1;
+      board.get_mut(next_pos).ant = ant_number;
       board.get_mut(next_pos).cycle = pos + 1;
+      board.get_mut(next_pos).attack = dangerous_place_for_enemies[next_pos];
+      simple_wave(width, height, tags, tagged, next_pos, |pos, _, _| {
+        if euclidean(width, height, next_pos, pos) <= attack_radius2 {
+          if (*board)[pos].ant != 0 && (*board)[pos].ant != ant_number {
+            board.get_mut(pos).attack += 1;
+            if (*board)[pos].ant != 1 {
+              board.get_mut(next_pos).attack += 1;
+            }
+          }
+          true
+        } else {
+          false
+        }
+      }, |_, _, _| { false });
+      clear_tags(tags, tagged);
       let cur_estimate = minimax_min(width, height, idx + 1, minimax_moved, enemies, other_ours, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, start_time, turn_time, aggression, log);
+      simple_wave(width, height, tags, tagged, next_pos, |pos, _, _| {
+        if euclidean(width, height, next_pos, pos) <= attack_radius2 {
+          let board_cell = board.get_mut(pos);
+          if board_cell.ant != 0 && board_cell.ant != ant_number {
+            board_cell.attack -= 1;
+          }
+          true
+        } else {
+          false
+        }
+      }, |_, _, _| { false });
+      clear_tags(tags, tagged);
+      board.get_mut(next_pos).attack = 0;
       board.get_mut(next_pos).ant = 0;
       board.get_mut(next_pos).cycle = 0;
       minimax_moved.pop();
@@ -1005,7 +1010,7 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
     }
     min_estimate
   } else {
-    estimate(width, height, world, dangerous_place_for_enemies, attack_radius2, minimax_moved, other_ours, board, tags, tagged, aggression)
+    estimate(width, height, world, attack_radius2, minimax_moved, other_ours, board, tags, tagged, aggression)
   }
 }
 
