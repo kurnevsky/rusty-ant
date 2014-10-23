@@ -511,6 +511,18 @@ fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius
   let s_pos2_busy = is_water_or_food(s_pos2_cell) || is_players_ant(s_pos2_cell, 0) && moved[s_pos2];
   let w_pos2_busy = is_water_or_food(w_pos2_cell) || is_players_ant(w_pos2_cell, 0) && moved[w_pos2];
   let e_pos2_busy = is_water_or_food(e_pos2_cell) || is_players_ant(e_pos2_cell, 0) && moved[e_pos2];
+  if !n_pos2_busy && euclidean(width, height, pos1, n_pos2) <= attack_radius2 {
+    return true;
+  }
+  if !s_pos2_busy && euclidean(width, height, pos1, s_pos2) <= attack_radius2 {
+    return true;
+  }
+  if !w_pos2_busy && euclidean(width, height, pos1, w_pos2) <= attack_radius2 {
+    return true;
+  }
+  if !e_pos2_busy && euclidean(width, height, pos1, e_pos2) <= attack_radius2 {
+    return true;
+  }
   if !n_pos1_busy {
     let n_distance = euclidean(width, height, n_pos1, pos2);
     if n_distance <= attack_radius2 {
@@ -601,11 +613,7 @@ fn find_near_ants<T: MutableSeq<uint>>(width: uint, height: uint, ant_pos: uint,
         _ => { }
       }
     }
-    if euclidean(width, height, ant_pos, prev) <= attack_radius2 {
-      true
-    } else {
-      false
-    }
+    euclidean(width, height, ant_pos, prev) <= attack_radius2
   }, |_, _, _| { false });
   clear_tags(tags, tagged);
 }
