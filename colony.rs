@@ -1,8 +1,10 @@
 //TODO: аггрессивность, если игра долго идет, а противник известен только один.
 //TODO: динамический подбор констатнт минимакса путем определения производительности на этапе инициализации. Динамическое уменьшение этих констант при таймаутах.
-//TODO: агрессия возле муравейника в случае если враг его не видел.
 //TODO: захват муравейников вместо уничтожения.
-//TODO: не считать муравьев стоящими если у них меняется окружение.
+//TODO: три варианта атаки:
+//TODO: 1. для каждого противника вычислять минимаксом его осторожный ход (как это сейчас для себя делаем), а затем вычислить свой лучший ход на эти ходы.
+//TODO: 2. попыка вычислить итеративно точку равновесие Нэша - для своих стоящих на месте муравьев вычислить лучший ход противника, затем для этого лучшего хода вычислить наш лучший ход, и так далее. Делать так либо пока не достигнут предел итераций либо лучшие ответы перестанут меняться.
+//TODO: 3. в минимаксе вычислять не худший для нас, а лучший для врага ход. При этом придется отказаться от альфа-отсечния.
 
 use std::{int, uint, cmp};
 use std::collections::*;
@@ -55,6 +57,8 @@ static DISTANCE_TO_ENEMIES_ESTIMATION: &'static [uint] = &[1, 1, 1, 1, 1, 1];
 
 static STANDING_ANTS_CONST: uint = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
 
+static STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST: uint = 4;
+
 static NEIGHBORS_AGGRESSION: &'static [uint] = &[0, 0, 1, 1, 1, 2, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
 
 static OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: uint = 6; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
@@ -88,7 +92,7 @@ pub struct Colony {
   last_world: Vec<Cell>, // Предыдущее состояние мира со сделавшими ход нашими муравьями.
   visible_area: Vec<uint>, // Равняется 0 для видимых клеток и известной воды, для остальных увеличивается на 1 перед каждым ходом.
   discovered_area: Vec<uint>,
-  standing_ants: Vec<uint>, // Каждый ход увеличивается на 1 для вражеских муравьев и сбрасывается в 0 для всех остальных клеток. То есть показывает, сколько ходов на месте стоит вражеский муравей.
+  standing_ants: Vec<uint>, // Каждый ход увеличивается на 1 для вражеских муравьев (при условии, что у них не изменилось окружение) и сбрасывается в 0 для всех остальных клеток. То есть показывает, сколько ходов на месте стоит вражеский муравей.
   moved: Vec<bool>, // Помечаются флагом клетки, откуда сделал ход наш муравей, а также куда он сделал ход.
   gathered_food: Vec<uint>, // Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1.
   territory: Vec<uint>,
@@ -219,7 +223,7 @@ fn move_all<T: MutableSeq<Step>>(width: uint, height: uint, world: &mut Vec<Cell
   }
 }
 
-fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint, world: &Vec<Cell>, discovered_area: &Vec<uint>, dangerous_place: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ant_pos: uint) -> Option<uint> {
+fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint, world: &Vec<Cell>, discovered_area: &Vec<uint>, dangerous_place: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ant_pos: uint, rng: &mut XorShiftRng) -> Option<uint> {
   let mut n_score = 0u;
   let mut s_score = 0u;
   let mut w_score = 0u;
@@ -280,16 +284,27 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
     }, |_, _, _| { false });
     clear_tags(tags, tagged);
   }
-  if n_score == 0 && s_score == 0 && w_score == 0 && e_score == 0 { //TODO: при равенстве учитывать расстояние до своих муравьев.
+  if n_score == 0 && s_score == 0 && w_score == 0 && e_score == 0 { // При равенстве можно было бы учитывать расстояние до своих муравьев, однако на это нужно слишком много вычислений, поэтому выбираем случайно.
     None
-  } else if n_score >= s_score && n_score >= w_score && n_score >= e_score {
-    Some(n_pos)
-  } else if s_score >= n_score && s_score >= w_score && s_score >= e_score {
-    Some(s_pos)
-  } else if w_score >= e_score && w_score >= n_score && w_score >= s_score {
-    Some(w_pos)
   } else {
-    Some(e_pos)
+    let mut next_pos = n_pos;
+    let mut score = n_score;
+    if s_score > score {
+      next_pos = s_pos;
+      score = s_score;
+    } else if s_score == score && rng.gen() {
+      next_pos = s_pos;
+    }
+    if w_score > score {
+      next_pos = w_pos;
+      score = w_score;
+    } else if w_score == score && rng.gen() {
+      next_pos = w_pos;
+    }
+    if e_score > score || e_score == score && rng.gen() {
+      next_pos = e_pos;
+    }
+    Some(next_pos)
   }
 }
 
@@ -303,7 +318,7 @@ fn discover<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     if colony.moved[pos] {
       continue;
     }
-    match discover_direction(width, height, min_view_radius_manhattan, &colony.world, discovered_area, &colony.dangerous_place, &mut colony.tags, &mut colony.tagged, pos) {
+    match discover_direction(width, height, min_view_radius_manhattan, &colony.world, discovered_area, &colony.dangerous_place, &mut colony.tags, &mut colony.tagged, pos, &mut colony.rng) {
       Some(next_pos) => {
         simple_wave(width, height, &mut colony.tags, &mut colony.tagged, next_pos, |pos, _, _| {
           if manhattan(width, height, pos, next_pos) <= min_view_radius_manhattan {
@@ -327,25 +342,10 @@ fn travel<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
   let width = colony.width;
   let height = colony.height;
   let world = &mut colony.world;
-  let territory = &mut colony.territory;
-  let territory_path_size = colony.max_view_radius_manhattan + TERRITORY_PATH_SIZE_CONST;
+  let territory = &colony.territory;
   let moved = &mut colony.moved;
   let tmp = &mut colony.tmp;
   let dangerous_place = &colony.dangerous_place;
-  wave(width, height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()).chain(colony.enemies_anthills.iter()), |pos, start_pos, path_size, _| {
-    if path_size <= territory_path_size && (*world)[pos] != Water {
-      match (*world)[start_pos] {
-        AnthillWithAnt(player) => *territory.get_mut(pos) = player + 1,
-        Ant(player) => *territory.get_mut(pos) = player + 1,
-        Anthill(player) => *territory.get_mut(pos) = player + 1,
-        _ => *territory.get_mut(pos) = 1
-      }
-      true
-    } else {
-      false
-    }
-  }, |_, _, _, _| { false });
-  clear_tags(&mut colony.tags, &mut colony.tagged);
   let mut path = DList::new();
   for &ant_pos in colony.ours_ants.iter() {
     if (*moved)[ant_pos] {
@@ -361,7 +361,7 @@ fn travel<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
         *tmp.get_mut(pos) = if is_players_ant(cell, 0) { is_column } else { 0 };
         true
       }
-    }, |pos, _, _| { (*territory)[pos] != 1 });
+    }, |pos, _, _| { territory[pos] != 1 });
     if goal.is_none() {
       for &pos in colony.tagged.iter() {
         *tmp.get_mut(pos) = 0;
@@ -386,6 +386,26 @@ fn travel<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
     }
     move_all(width, height, world, moved, output, &moves, &mut colony.log);
   }
+}
+
+fn calculate_territory(colony: &mut Colony) {
+  let territory_path_size = colony.max_view_radius_manhattan + TERRITORY_PATH_SIZE_CONST;
+  let world = &colony.world;
+  let territory = &mut colony.territory;
+  wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()).chain(colony.enemies_anthills.iter()), |pos, start_pos, path_size, _| {
+    if path_size <= territory_path_size && world[pos] != Water {
+      match world[start_pos] {
+        AnthillWithAnt(player) => *territory.get_mut(pos) = player + 1,
+        Ant(player) => *territory.get_mut(pos) = player + 1,
+        Anthill(player) => *territory.get_mut(pos) = player + 1,
+        _ => *territory.get_mut(pos) = 1
+      }
+      true
+    } else {
+      false
+    }
+  }, |_, _, _, _| { false });
+  clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
 fn attack_anthills<T: MutableSeq<Step>>(colony: &mut Colony, output: &mut T) {
@@ -1573,16 +1593,17 @@ fn shuffle(colony: &mut Colony) {
 
 fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) {
   let view_radius2 = colony.view_radius2;
+  let attack_radius2 = colony.attack_radius2;
   let min_view_radius_manhattan = colony.min_view_radius_manhattan;
   let width = colony.width;
   let height = colony.height;
   let visible_area = &mut colony.visible_area;
   let discovered_area = &mut colony.discovered_area;
+  let last_world = &mut colony.last_world;
   let world = &mut colony.world;
-  let standing_ants = &mut colony.standing_ants;
   let len = length(width, height);
   for pos in range(0u, len) {
-    *colony.last_world.get_mut(pos) = (*world)[pos];
+    *last_world.get_mut(pos) = (*world)[pos];
     *world.get_mut(pos) = Unknown;
     *colony.moved.get_mut(pos) = false;
     *colony.gathered_food.get_mut(pos) = 0;
@@ -1655,18 +1676,18 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
   for pos in range(0u, len) {
     if (*visible_area)[pos] == 0 {
       if (*world)[pos] == Unknown {
-        *world.get_mut(pos) = match colony.last_world[pos] {
+        *world.get_mut(pos) = match (*last_world)[pos] {
           Water => Water,
           _ => Land
         }
       }
       if is_enemy_ant((*world)[pos]) {
-        *standing_ants.get_mut(pos) += 1;
+        *colony.standing_ants.get_mut(pos) += 1;
       } else {
-        *standing_ants.get_mut(pos) = 0;
+        *colony.standing_ants.get_mut(pos) = 0;
       }
     } else {
-      *world.get_mut(pos) = match colony.last_world[pos] {
+      *world.get_mut(pos) = match (*last_world)[pos] {
          Water => {
           *visible_area.get_mut(pos) = 0;
           Water
@@ -1696,19 +1717,14 @@ fn update_world<'r, T: Iterator<&'r Input>>(colony: &mut Colony, input: &mut T) 
           AnthillWithAnt(player)
         }
       };
-      *standing_ants.get_mut(pos) = 0;
+      *colony.standing_ants.get_mut(pos) = 0;
     }
   }
-  for pos in range(0u, len) {
-    if is_enemy_ant(colony.last_world[pos]) != is_enemy_ant((*world)[pos]) {
-      simple_wave(width, height, &mut colony.tags, &mut colony.tagged, pos, |near_pos, _, _| {
-        if is_enemy_ant((*world)[near_pos]) {
-          *standing_ants.get_mut(near_pos) = 1;
-          true
-        } else {
-          near_pos == pos
-        }
-      }, |_, _, _| { false });
+  for ant_pos in range(0u, len) {
+    if colony.standing_ants[ant_pos] > STANDING_ANTS_CONST {
+      if !simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |_, _, prev| { euclidean(width, height, prev, ant_pos) <= attack_radius2 }, |pos, _, _| { (*last_world)[pos] != Unknown && (*last_world)[pos] != (*world)[pos] }).is_none() {
+        *colony.standing_ants.get_mut(ant_pos) = STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST;
+      }
       clear_tags(&mut colony.tags, &mut colony.tagged);
     }
   }
@@ -1735,11 +1751,11 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   calculate_dangerous_place(colony);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
-  calculate_aggressive_place(colony);
-  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   attack_anthills(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   gather_food(colony, output);
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
+  calculate_aggressive_place(colony);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   attack(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
@@ -1750,6 +1766,8 @@ pub fn turn<'r, T1: Iterator<&'r Input>, T2: MutableSeq<Step>>(colony: &mut Colo
   approach_enemies(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   discover(colony, output);
+  if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
+  calculate_territory(colony);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
   travel(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
