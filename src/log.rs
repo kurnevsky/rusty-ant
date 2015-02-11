@@ -1,7 +1,7 @@
 use std::collections::DList;
 use coordinates::*;
 
-#[deriving(Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum LogMessage {
   Turn(uint),
   Attack,
@@ -45,69 +45,69 @@ fn write_ants<T: Writer>(width: uint, ants: &DList<uint>, writer: &mut T) {
 pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T) {
   for log_message in log.iter() {
     match *log_message {
-      Turn(turn) => {
+      LogMessage::Turn(turn) => {
         writer.write_str("Turn number: ").ok();
         writer.write_uint(turn).ok();
         writer.write_line("").ok();
       },
-      Attack => {
+      LogMessage::Attack => {
         writer.write_line("  Attack.").ok();
       },
-      AttackAnthills => {
+      LogMessage::AttackAnthills => {
         writer.write_line("  Attack anthills.").ok();
       },
-      GatherFood => {
+      LogMessage::GatherFood => {
         writer.write_line("  Gather food.").ok();
       },
-      Discover => {
+      LogMessage::Discover => {
         writer.write_line("  Discover.").ok();
       },
-      Travel => {
+      LogMessage::Travel => {
         writer.write_line("  Travel.").ok();
       },
-      MoveRandom => {
+      LogMessage::MoveRandom => {
         writer.write_line("  Move random.").ok();
       },
-      Escape => {
+      LogMessage::Escape => {
         writer.write_line("  Escape.").ok();
       },
-      ApproachEnemies => {
+      LogMessage::ApproachEnemies => {
         writer.write_line("  Approach enemies.").ok();
       },
-      DefendAnthills => {
+      LogMessage::DefendAnthills => {
         writer.write_line("  Defend anthills.").ok();
       },
-      Group(group_index) => {
+      LogMessage::Group(group_index) => {
         writer.write_str("    Group number: ").ok();
         writer.write_uint(group_index).ok();
         writer.write_line("").ok();
       },
-      Aggression(aggression) => {
+      LogMessage::Aggression(aggression) => {
         writer.write_str("    Aggression level: ").ok();
         writer.write_uint(aggression).ok();
         writer.write_line("").ok();
       },
-      Estimate(estimate) => {
+      LogMessage::Estimate(estimate) => {
         writer.write_str("    Estimation: ").ok();
         writer.write_int(estimate).ok();
         writer.write_line("").ok();
       },
-      OursAnts(ref ants) => {
+      LogMessage::OursAnts(ref ants) => {
         writer.write_str("    Ours ants: ").ok();
         write_ants(width, &**ants, writer);
         writer.write_line("").ok();
       },
-      OtherOursAnts(ref ants) => {
+      LogMessage::OtherOursAnts(ref ants) => {
         writer.write_str("    Other ours ants: ").ok();
         write_ants(width, &**ants, writer);
         writer.write_line("").ok();
       },
-      EnemiesAnts(ref ants) => {
+      LogMessage::EnemiesAnts(ref ants) => {
         writer.write_str("    Enemies ants: ").ok();
         write_ants(width, &**ants, writer);
         writer.write_line("").ok();
       },
-      GroupSize(ours_moves_count, enemies_count) => {
+      LogMessage::GroupSize(ours_moves_count, enemies_count) => {
         writer.write_str("    Group size: ").ok();
         writer.write_uint(ours_moves_count).ok();
         writer.write_str(" our moves; ").ok();
@@ -115,14 +115,14 @@ pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T
         writer.write_str(" enemies.").ok();
         writer.write_line("").ok();
       },
-      Goal(ant_pos, goal_pos) => {
+      LogMessage::Goal(ant_pos, goal_pos) => {
         writer.write_str("    Ours ant ").ok();
         write_pos(width, ant_pos, writer);
         writer.write_str(" has goal ").ok();
         write_pos(width, goal_pos, writer);
         writer.write_line(".").ok();
       },
-      Defender(anthill_pos, enemy_pos, ant_pos) => {
+      LogMessage::Defender(anthill_pos, enemy_pos, ant_pos) => {
         writer.write_str("    Ours anthill ").ok();
         write_pos(width, anthill_pos, writer);
         writer.write_str(" has defender ").ok();
@@ -131,20 +131,20 @@ pub fn write_log<T: Writer>(width: uint, log: &DList<LogMessage>, writer: &mut T
         write_pos(width, enemy_pos, writer);
         writer.write_line(".").ok();
       },
-      Timeout => {
+      LogMessage::Timeout => {
         writer.write_line("  Timeout.").ok();
       },
-      MinimaxTimeout => {
+      LogMessage::MinimaxTimeout => {
         writer.write_line("    Minimax timeout.").ok();
       },
-      Multitask(ant_pos, next_pos) => {
+      LogMessage::Multitask(ant_pos, next_pos) => {
         writer.write_str("    Multitask from ").ok();
         write_pos(width, ant_pos, writer);
         writer.write_str(" to ").ok();
         write_pos(width, next_pos, writer);
         writer.write_line(".").ok();
       },
-      Jump(ant_pos, next_pos) => {
+      LogMessage::Jump(ant_pos, next_pos) => {
         writer.write_str("    Jump from ").ok();
         write_pos(width, ant_pos, writer);
         writer.write_str(" to ").ok();

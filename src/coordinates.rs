@@ -1,10 +1,13 @@
-use std::{cmp, num};
+use std::cmp;
+use std::num::*;
 
+#[derive(Clone)]
 pub struct Point {
   pub y: uint,
   pub x: uint
 }
 
+#[derive(Clone)]
 pub enum Direction {
   North,
   South,
@@ -29,13 +32,13 @@ pub fn from_pos(width: uint, pos: uint) -> Point {
 
 pub fn to_direction(width: uint, height: uint, pos1: uint, pos2: uint) -> Option<Direction> {
   if n(width, height, pos1) == pos2 {
-    Some(North)
+    Some(Direction::North)
   } else if s(width, height, pos1) == pos2 {
-    Some(South)
+    Some(Direction::South)
   } else if w(width, pos1) == pos2 {
-    Some(West)
+    Some(Direction::West)
   } else if e(width, pos1) == pos2 {
-    Some(East)
+    Some(Direction::East)
   } else {
     None
   }
@@ -113,15 +116,15 @@ pub fn se(width: uint, height: uint, pos: uint) -> uint {
 }
 
 pub fn point_manhattan(width: uint, height: uint, point1: Point, point2: Point) -> uint {
-  let diff_x = num::abs(point1.x as int - point2.x as int) as uint;
-  let diff_y = num::abs(point1.y as int - point2.y as int) as uint;
+  let diff_x = (point1.x as int - point2.x as int).abs() as uint;
+  let diff_y = (point1.y as int - point2.y as int).abs() as uint;
   cmp::min(diff_x, width - diff_x) + cmp::min(diff_y, height - diff_y)
 }
 
 pub fn point_euclidean(width: uint, height: uint, point1: Point, point2: Point) -> uint {
-  let diff_x = num::abs(point1.x as int - point2.x as int) as uint;
-  let diff_y = num::abs(point1.y as int - point2.y as int) as uint;
-  num::pow(cmp::min(diff_x, width - diff_x), 2) + num::pow(cmp::min(diff_y, height - diff_y), 2)
+  let diff_x = (point1.x as int - point2.x as int).abs() as uint;
+  let diff_y = (point1.y as int - point2.y as int).abs() as uint;
+  cmp::min(diff_x, width - diff_x).pow(2) + cmp::min(diff_y, height - diff_y).pow(2)
 }
 
 pub fn manhattan(width: uint, height: uint, pos1: uint, pos2: uint) -> uint {

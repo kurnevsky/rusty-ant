@@ -1,4 +1,4 @@
-#[deriving(Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Cell {
   Anthill(uint),
   AnthillWithAnt(uint),
@@ -11,53 +11,53 @@ pub enum Cell {
 
 pub fn is_free(cell: Cell) -> bool {
   match cell {
-    Land | Unknown | Anthill(_) => true,
+    Cell::Land | Cell::Unknown | Cell::Anthill(_) => true,
     _ => false
   }
 }
 
 pub fn is_water_or_food(cell: Cell) -> bool {
   match cell {
-    Water | Food => true,
+    Cell::Water | Cell::Food => true,
     _ => false
   }
 }
 
 pub fn is_ant(cell: Cell) -> bool {
   match cell {
-    AnthillWithAnt(_) | Ant(_) => true,
+    Cell::AnthillWithAnt(_) | Cell::Ant(_) => true,
     _ => false
   }
 }
 
 pub fn is_players_ant(cell: Cell, player: uint) -> bool {
-  cell == Ant(player) || cell == AnthillWithAnt(player)
+  cell == Cell::Ant(player) || cell == Cell::AnthillWithAnt(player)
 }
 
 pub fn is_enemy_ant(cell: Cell) -> bool {
   match cell {
-    Ant(player) if player > 0 => true,
-    AnthillWithAnt(player) if player > 0 => true,
+    Cell::Ant(player) if player > 0 => true,
+    Cell::AnthillWithAnt(player) if player > 0 => true,
     _ => false
   }
 }
 
 pub fn is_enemy_anthill(cell: Cell) -> bool {
   match cell {
-    Anthill(player) if player > 0 => true,
-    AnthillWithAnt(player) if player > 0 => true,
+    Cell::Anthill(player) if player > 0 => true,
+    Cell::AnthillWithAnt(player) if player > 0 => true,
     _ => false
   }
 }
 
 pub fn is_our_anthill(cell: Cell) -> bool {
-  cell == Anthill(0) || cell == AnthillWithAnt(0)
+  cell == Cell::Anthill(0) || cell == Cell::AnthillWithAnt(0)
 }
 
 pub fn ant_owner(cell: Cell) -> Option<uint> {
   match cell {
-    Ant(player) => Some(player),
-    AnthillWithAnt(player) => Some(player),
+    Cell::Ant(player) => Some(player),
+    Cell::AnthillWithAnt(player) => Some(player),
     _ => None
   }
 }
