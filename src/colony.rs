@@ -6,8 +6,10 @@
 //TODO: 2. попыка вычислить итеративно точку равновесие Нэша - для своих стоящих на месте муравьев вычислить лучший ход противника, затем для этого лучшего хода вычислить наш лучший ход, и так далее. Делать так либо пока не достигнут предел итераций либо лучшие ответы перестанут меняться.
 //TODO: 3. в минимаксе вычислять не худший для нас, а лучший для врага ход. При этом придется отказаться от альфа-отсечния.
 
-use std::{int, uint, cmp, iter};
+use std::{int, uint};
+use std::cmp::*;
 use std::num::*;
+use std::iter::*;
 use std::collections::*;
 use rand::*;
 use coordinates::*;
@@ -134,24 +136,24 @@ impl Colony {
       max_view_radius_manhattan: ((view_radius2 * 2) as f32).sqrt() as uint,
       max_attack_radius_manhattan: ((attack_radius2 * 2) as f32).sqrt() as uint,
       enemies_count: 0,
-      world: iter::repeat(Cell::Unknown).take(len).collect(),
-      last_world: iter::repeat(Cell::Unknown).take(len).collect(),
-      visible_area: iter::repeat(0u).take(len).collect(),
-      discovered_area: iter::repeat(0u).take(len).collect(),
-      standing_ants: iter::repeat(0u).take(len).collect(),
-      moved: iter::repeat(false).take(len).collect(),
-      gathered_food: iter::repeat(0u).take(len).collect(),
-      territory: iter::repeat(0u).take(len).collect(),
-      dangerous_place: iter::repeat(0u).take(len).collect(),
-      aggressive_place: iter::repeat(0u).take(len).collect(),
-      groups: iter::repeat(0u).take(len).collect(),
-      fighting: iter::repeat(false).take(len).collect(),
-      board: iter::repeat(BoardCell { ant: 0, attack: 0, cycle: 0, dead: false }).take(len).collect(),
-      tmp: iter::repeat(0u).take(len).collect(),
+      world: repeat(Cell::Unknown).take(len).collect(),
+      last_world: repeat(Cell::Unknown).take(len).collect(),
+      visible_area: repeat(0u).take(len).collect(),
+      discovered_area: repeat(0u).take(len).collect(),
+      standing_ants: repeat(0u).take(len).collect(),
+      moved: repeat(false).take(len).collect(),
+      gathered_food: repeat(0u).take(len).collect(),
+      territory: repeat(0u).take(len).collect(),
+      dangerous_place: repeat(0u).take(len).collect(),
+      aggressive_place: repeat(0u).take(len).collect(),
+      groups: repeat(0u).take(len).collect(),
+      fighting: repeat(false).take(len).collect(),
+      board: repeat(BoardCell { ant: 0, attack: 0, cycle: 0, dead: false }).take(len).collect(),
+      tmp: repeat(0u).take(len).collect(),
       alone_ants: Vec::with_capacity(len),
-      tags: iter::repeat(Tag::new()).take(len).collect(),
+      tags: repeat(Tag::new()).take(len).collect(),
       tagged: Vec::with_capacity(len),
-      tags2: iter::repeat(Tag::new()).take(len).collect(),
+      tags2: repeat(Tag::new()).take(len).collect(),
       tagged2: Vec::with_capacity(len),
       ours_ants: Vec::with_capacity(len),
       enemies_ants: Vec::with_capacity(len),
@@ -1065,13 +1067,13 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
       let pos1_dangerous = dangerous_place_for_enemies[pos1] > 0;
       let pos2_dangerous = dangerous_place_for_enemies[pos2] > 0;
       if pos1_dangerous && !pos2_dangerous {
-        cmp::Ordering::Less
+        Ordering::Less
       } else if !pos1_dangerous && pos2_dangerous {
-        cmp::Ordering::Greater
+        Ordering::Greater
       } else if pos1_dangerous && pos2_dangerous {
         get_escape_moves_count(width, height, pos1, world, dangerous_place_for_enemies).cmp(&get_escape_moves_count(width, height, pos2, world, dangerous_place_for_enemies))
       } else {
-        cmp::Ordering::Equal
+        Ordering::Equal
       }
     });
     let cur_estimate = minimax_min(width, height, 0, minimax_moved, enemies, other_ours, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, *alpha, start_time, turn_time, aggression, log);
@@ -1185,13 +1187,13 @@ fn attack(colony: &mut Colony, output: &mut DList<Step>) {
         let pos1_dangerous = colony.dangerous_place[pos1] > 0;
         let pos2_dangerous = colony.dangerous_place[pos2] > 0;
         if pos1_dangerous && !pos2_dangerous {
-          cmp::Ordering::Less
+          Ordering::Less
         } else if !pos1_dangerous && pos2_dangerous {
-          cmp::Ordering::Greater
+          Ordering::Greater
         } else if pos1_dangerous && pos2_dangerous {
           get_escape_moves_count(colony.width, colony.height, pos1, &colony.world, &colony.dangerous_place).cmp(&get_escape_moves_count(colony.width, colony.height, pos2, &colony.world, &colony.dangerous_place))
         } else {
-          cmp::Ordering::Equal
+          Ordering::Equal
         }
       });
       for &pos in ours.iter() {
@@ -1398,7 +1400,7 @@ fn calculate_aggressive_place(colony: &mut Colony) {
   }
   wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_anthills.iter(), |pos, _, path_size, _| {
     if path_size <= OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE {
-      *aggressive_place.get_mut(pos).unwrap() = cmp::max(aggressive_place[pos], OURS_ANTHILLS_AGGRESSION);
+      *aggressive_place.get_mut(pos).unwrap() = max(aggressive_place[pos], OURS_ANTHILLS_AGGRESSION);
       true
     } else {
       false
