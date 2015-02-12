@@ -9,7 +9,7 @@
 use std::{int, uint, cmp, iter};
 use std::num::*;
 use std::collections::*;
-use std::rand::*;
+use rand::*;
 use coordinates::*;
 use time::*;
 use wave::*;

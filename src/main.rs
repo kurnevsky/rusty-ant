@@ -4,6 +4,8 @@
 #![feature(rand)]
 #![feature(io)]
 
+extern crate rand;
+
 use std::collections::*;
 use std::str::*;
 use std::old_io as io;
