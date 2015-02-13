@@ -1,7 +1,6 @@
 #![feature(box_syntax)]
 #![feature(int_uint)]
 #![feature(core)]
-#![feature(rand)]
 #![feature(io)]
 
 extern crate rand;
