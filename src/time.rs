@@ -5,6 +5,6 @@ pub fn get_time() -> u64 {
   (ts.sec as u64) * 1000 + (ts.nsec as u64) / 1000000
 }
 
-pub fn elapsed_time(start_time: u64) -> uint {
-  (get_time() - start_time) as uint
+pub fn elapsed_time(start_time: u64) -> u32 {
+  (get_time() - start_time) as u32
 }

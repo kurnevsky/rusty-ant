@@ -1,13 +1,12 @@
-#![feature(box_syntax)]
-#![feature(int_uint)]
-#![feature(core)]
-#![feature(io)]
+#![allow(dead_code)]
+#![feature(convert)]
 
 extern crate rand;
 
-use std::collections::*;
-use std::str::*;
-use std::old_io as io;
+use std::collections::LinkedList;
+use std::str::FromStr;
+use std::io;
+use std::io::{BufRead, BufReader, Write};
 use coordinates::*;
 use step::*;
 use colony::*;
@@ -23,38 +22,40 @@ mod wave;
 mod log;
 mod colony;
 
-fn read_nonempty_line(reader: &mut io::stdio::StdinReader) -> String {
-   loop {
-    let input = reader.read_line().ok().expect("Failed to read line!");
+fn read_nonempty_line<T: BufRead>(reader: &mut T) -> String {
+  let mut input = String::new();
+  loop {
+    reader.read_line(&mut input).ok();
     if !input.is_empty() {
-      return input;
+      break;
     }
   }
+  input
 }
 
-fn read_turn(reader: &mut io::stdio::StdinReader) -> Option<uint> {
+fn read_turn<T: BufRead>(reader: &mut T) -> Option<usize> {
   let input = read_nonempty_line(reader);
-  let split: Vec<&str> = input.as_slice().trim().split(' ').collect();
+  let split: Vec<&str> = input.as_str().trim().split(' ').collect();
   if split.len() != 2 || split[0] != "turn" {
-    return None;
+    None
   } else {
-    return split[1].parse().ok();
+    usize::from_str(split[1]).ok()
   }
 }
 
-fn init_colony(reader: &mut io::stdio::StdinReader) -> Option<Box<Colony>> {
-  let mut load_time = None;
-  let mut turn_time = None;
-  let mut width = None;
-  let mut height = None;
-  let mut turns = None;
-  let mut view_radius2 = None;
-  let mut attack_radius2 = None;
-  let mut spawn_radius2 = None;
-  let mut seed: Option<i64> = None;
+fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
+  let mut load_time_option = None;
+  let mut turn_time_option = None;
+  let mut width_option = None;
+  let mut height_option = None;
+  let mut turns_option = None;
+  let mut view_radius2_option = None;
+  let mut attack_radius2_option = None;
+  let mut spawn_radius2_option = None;
+  let mut seed_option: Option<i64> = None;
   loop {
     let input = read_nonempty_line(reader);
-    let split: Vec<&str> = input.as_slice().trim().split(' ').collect();
+    let split: Vec<&str> = input.as_str().trim().split(' ').collect();
     if split.len() == 0 {
       return None;
     }
@@ -63,107 +64,107 @@ fn init_colony(reader: &mut io::stdio::StdinReader) -> Option<Box<Colony>> {
         if split.len() != 1 {
           return None;
         }
-        if load_time.is_none() ||
-           turn_time.is_none() ||
-           width.is_none() ||
-           height.is_none() ||
-           turns.is_none() ||
-           view_radius2.is_none() ||
-           attack_radius2.is_none() ||
-           spawn_radius2.is_none() ||
-           seed.is_none() {
+        if load_time_option.is_none() ||
+           turn_time_option.is_none() ||
+           width_option.is_none() ||
+           height_option.is_none() ||
+           turns_option.is_none() ||
+           view_radius2_option.is_none() ||
+           attack_radius2_option.is_none() ||
+           spawn_radius2_option.is_none() ||
+           seed_option.is_none() {
           return None;
         }
-        return Some(box Colony::new(
-          width.unwrap(),
-          height.unwrap(),
-          turn_time.unwrap(),
-          turns.unwrap(),
-          view_radius2.unwrap(),
-          attack_radius2.unwrap(),
-          spawn_radius2.unwrap(),
-          seed.unwrap() as u64
-        ));
+        return Some(Box::new(Colony::new(
+          width_option.unwrap(),
+          height_option.unwrap(),
+          turn_time_option.unwrap(),
+          turns_option.unwrap(),
+          view_radius2_option.unwrap(),
+          attack_radius2_option.unwrap(),
+          spawn_radius2_option.unwrap(),
+          seed_option.unwrap() as u64
+        )));
       },
       "loadtime" => {
         if split.len() != 2 {
           return None;
         }
-        match split[1].parse::<uint>().ok() {
-          Some(x) => load_time = Some(x),
-          None => return None
+        load_time_option = usize::from_str(split[1]).ok();
+        if load_time_option.is_none() {
+          return None;
         }
       },
       "turntime" => {
         if split.len() != 2 {
           return None;
         }
-        match split[1].parse::<uint>().ok() {
-          Some(x) => turn_time = Some(x),
-          None => return None
+        turn_time_option = u32::from_str(split[1]).ok();
+        if turn_time_option.is_none() {
+          return None;
         }
       },
       "rows" => {
         if split.len() != 2 {
           return None;
         }
-        match split[1].parse::<uint>().ok() {
-          Some(x) => height = Some(x),
-          None => return None
+        height_option = usize::from_str(split[1]).ok();
+        if height_option.is_none() {
+          return None;
         }
       },
       "cols" => {
         if split.len() != 2 {
           return None;
         }
-        match split[1].parse::<uint>().ok() {
-          Some(x) => width = Some(x),
-          None => return None
+        width_option = usize::from_str(split[1]).ok();
+        if width_option.is_none() {
+          return None;
         }
       },
       "turns" => {
         if split.len() != 2 {
           return None;
         }
-        match split[1].parse::<uint>().ok() {
-          Some(x) => turns = Some(x),
-          None => return None
+        turns_option = usize::from_str(split[1]).ok();
+        if turns_option.is_none() {
+          return None;
         }
       },
       "viewradius2" => {
         if split.len() != 2 {
           return None;
         }
-        match split[1].parse::<uint>().ok() {
-          Some(x) => view_radius2 = Some(x),
-          None => return None
+        view_radius2_option = usize::from_str(split[1]).ok();
+        if view_radius2_option.is_none() {
+          return None;
         }
       },
       "attackradius2" => {
         if split.len() != 2 {
           return None;
         }
-        match split[1].parse::<uint>().ok() {
-          Some(x) => attack_radius2 = Some(x),
-          None => return None
+        attack_radius2_option = usize::from_str(split[1]).ok();
+        if attack_radius2_option.is_none() {
+          return None;
         }
       },
       "spawnradius2" => {
         if split.len() != 2 {
           return None;
         }
-        match split[1].parse::<uint>().ok() {
-          Some(x) => spawn_radius2 = Some(x),
-          None => return None
+        spawn_radius2_option = usize::from_str(split[1]).ok();
+        if spawn_radius2_option.is_none() {
+          return None;
         }
       },
       "player_seed" => {
         if split.len() != 2 {
           return None;
         }
-        match split[1].parse::<i64>().ok() {
-          Some(x) => seed = Some(x),
-          None => return None
+        seed_option = i64::from_str(split[1]).ok();
+        if seed_option.is_none() {
+          return None;
         }
       },
       _ => { }
@@ -171,11 +172,11 @@ fn init_colony(reader: &mut io::stdio::StdinReader) -> Option<Box<Colony>> {
   }
 }
 
-fn turn_info(reader: &mut io::stdio::StdinReader) -> Option<Box<DList<Input>>> {
-  let mut input = box DList::new();
+fn turn_info<T: BufRead>(reader: &mut T) -> Option<Box<LinkedList<Input>>> {
+  let mut input = Box::new(LinkedList::new());
   loop {
     let string = read_nonempty_line(reader);
-    let split: Vec<&str> = string.as_slice().trim().split(' ').collect();
+    let split: Vec<&str> = string.as_str().trim().split(' ').collect();
     if split.len() == 0 {
       return None;
     }
@@ -190,84 +191,72 @@ fn turn_info(reader: &mut io::stdio::StdinReader) -> Option<Box<DList<Input>>> {
         if split.len() != 3 {
           return None;
         }
-        let row = split[1].parse::<uint>().ok();
-        let col = split[2].parse::<uint>().ok();
-        if row.is_none() || col.is_none() {
+        if let (Some(row), Some(col)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok()) {
+          input.push_back(Input::Water(Point { x: col, y: row }));
+        } else {
           return None;
         }
-        input.push_back(Input::InputWater(Point { x: col.unwrap(), y: row.unwrap() }));
       },
       "f" => {
         if split.len() != 3 {
           return None;
         }
-        let row = split[1].parse::<uint>().ok();
-        let col = split[2].parse::<uint>().ok();
-        if row.is_none() || col.is_none() {
+        if let (Some(row), Some(col)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok()) {
+          input.push_back(Input::Food(Point { x: col, y: row }));
+        } else {
           return None;
         }
-        input.push_back(Input::InputFood(Point { x: col.unwrap(), y: row.unwrap() }));
       },
       "h" => {
         if split.len() != 4 {
           return None;
         }
-        let row = split[1].parse::<uint>().ok();
-        let col = split[2].parse::<uint>().ok();
-        let player = split[3].parse::<uint>().ok();
-        if row.is_none() || col.is_none() || player.is_none() {
+        if let (Some(row), Some(col), Some(player)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok(), usize::from_str(split[3]).ok()) {
+          input.push_back(Input::Anthill(Point { x: col, y: row }, player));
+        } else {
           return None;
         }
-        input.push_back(Input::InputAnthill(Point { x: col.unwrap(), y: row.unwrap() }, player.unwrap()));
       },
       "a" => {
         if split.len() != 4 {
           return None;
         }
-        let row = split[1].parse::<uint>().ok();
-        let col = split[2].parse::<uint>().ok();
-        let player = split[3].parse::<uint>().ok();
-        if row.is_none() || col.is_none() || player.is_none() {
+        if let (Some(row), Some(col), Some(player)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok(), usize::from_str(split[3]).ok()) {
+          input.push_back(Input::Ant(Point { x: col, y: row }, player));
+        } else {
           return None;
         }
-        input.push_back(Input::InputAnt(Point { x: col.unwrap(), y: row.unwrap() }, player.unwrap()));
       },
       "d" => {
         if split.len() != 4 {
           return None;
         }
-        let row = split[1].parse::<uint>().ok();
-        let col = split[2].parse::<uint>().ok();
-        let player = split[3].parse::<uint>().ok();
-        if row.is_none() || col.is_none() || player.is_none() {
+        if let (Some(row), Some(col), Some(player)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok(), usize::from_str(split[3]).ok()) {
+          input.push_back(Input::Dead(Point { x: col, y: row }, player));
+        } else {
           return None;
         }
-        input.push_back(Input::InputDead(Point { x: col.unwrap(), y: row.unwrap() }, player.unwrap()));
       },
-      _ => return None
+      _ => {
+        return None;
+      }
     }
   }
 }
 
-fn print_output<T: Writer>(writer: &mut T, output: &mut DList<Step>) {
+fn print_output<T: Write>(writer: &mut T, output: &mut LinkedList<Step>) {
   for i in output.iter() {
-    writer.write_str("o ").ok();
-    writer.write_uint(i.point.y).ok();
-    writer.write_char(' ').ok();
-    writer.write_uint(i.point.x).ok();
-    writer.write_char(' ').ok();
-    match i.direction {
-      Direction::North => writer.write_char('N').ok(),
-      Direction::South => writer.write_char('S').ok(),
-      Direction::West => writer.write_char('W').ok(),
-      Direction::East => writer.write_char('E').ok()
-    };
-    writer.write_char('\n').ok();
+    writeln!(writer, "o {0} {1} {2}", i.point.y, i.point.x, match i.direction {
+      Direction::North => 'N',
+      Direction::South => 'S',
+      Direction::West => 'W',
+      Direction::East => 'E'
+    }).ok();
   }
-  writer.write_line("go").ok();
+  writeln!(writer, "go").ok();
 }
 
-fn final_colony<T: Writer>(colony: &Colony, reader: &mut io::stdio::StdinReader, writer: &mut T) {
+fn final_colony<T1: BufRead, T2: Write>(colony: &Colony, reader: &mut T1, writer: &mut T2) {
   read_nonempty_line(reader);
   read_nonempty_line(reader);
   turn_info(reader);
@@ -275,17 +264,17 @@ fn final_colony<T: Writer>(colony: &Colony, reader: &mut io::stdio::StdinReader,
 }
 
 fn main() {
-  let mut stdin = io::stdin();
+  let mut stdin = BufReader::new(io::stdin());
   let mut stderr = io::stderr();
   let mut stdout = io::stdout();
-  let mut output: DList<Step> = DList::new();
+  let mut output: LinkedList<Step> = LinkedList::new();
   if read_turn(&mut stdin) != Some(0) {
-    stderr.write_line("Icorrect input 1!").ok();
+    writeln!(stderr, "Icorrect input 1!").ok();
     return;
   }
   match init_colony(&mut stdin) {
     Some(mut colony) => {
-      stdout.write_line("go").ok();
+      writeln!(stdout, "go").ok();
       loop {
         let turn_number = read_turn(&mut stdin);
         if turn_number != Some(colony.cur_turn() + 1) {
@@ -297,7 +286,7 @@ fn main() {
             print_output(&mut stdout, &mut output)
           },
           None => {
-            stderr.write_line("Icorrect input 3!").ok();
+            writeln!(stderr, "Icorrect input 3!").ok();
             return;
           }
         }
@@ -305,7 +294,7 @@ fn main() {
       final_colony(&*colony, &mut stdin, &mut stderr);
     },
     None => {
-      stderr.write_line("Icorrect input 4!").ok();
+      writeln!(stderr, "Icorrect input 4!").ok();
       return;
     }
   }

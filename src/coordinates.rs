@@ -1,13 +1,12 @@
 use std::cmp;
-use std::num::*;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Point {
-  pub y: uint,
-  pub x: uint
+  pub y: usize,
+  pub x: usize
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Direction {
   North,
   South,
@@ -15,22 +14,22 @@ pub enum Direction {
   East
 }
 
-pub fn length(width: uint, height: uint) -> uint {
+pub fn length(width: usize, height: usize) -> usize {
   width * height
 }
 
-pub fn to_pos(width: uint, point: Point) -> uint {
+pub fn to_pos(width: usize, point: Point) -> usize {
   point.y * width + point.x
 }
 
-pub fn from_pos(width: uint, pos: uint) -> Point {
+pub fn from_pos(width: usize, pos: usize) -> Point {
   Point {
     x: pos % width,
     y: pos / width
   }
 }
 
-pub fn to_direction(width: uint, height: uint, pos1: uint, pos2: uint) -> Option<Direction> {
+pub fn to_direction(width: usize, height: usize, pos1: usize, pos2: usize) -> Option<Direction> {
   if n(width, height, pos1) == pos2 {
     Some(Direction::North)
   } else if s(width, height, pos1) == pos2 {
@@ -44,46 +43,44 @@ pub fn to_direction(width: uint, height: uint, pos1: uint, pos2: uint) -> Option
   }
 }
 
-/*
-pub fn point_n(height: uint, point: Point) -> Point {
+pub fn point_n(height: usize, point: Point) -> Point {
   Point {
     x: point.x,
     y: (point.y - 1 + height) % height
   }
 }
 
-pub fn point_s(height: uint, point: Point) -> Point {
+pub fn point_s(height: usize, point: Point) -> Point {
   Point {
     x: point.x,
     y: (point.y + 1) % height
   }
 }
 
-pub fn point_w(width: uint, point: Point) -> Point {
+pub fn point_w(width: usize, point: Point) -> Point {
   Point {
     x: (point.x - 1 + width) % width,
     y: point.y
   }
 }
 
-pub fn point_e(width: uint, point: Point) -> Point {
+pub fn point_e(width: usize, point: Point) -> Point {
   Point {
     x: (point.x + 1) % width,
     y: point.y
   }
 }
-*/
 
-pub fn n(width: uint, height: uint, pos: uint) -> uint {
+pub fn n(width: usize, height: usize, pos: usize) -> usize {
   let len = length(width, height);
   (pos - width + len) % len
 }
 
-pub fn s(width: uint, height: uint, pos: uint) -> uint {
+pub fn s(width: usize, height: usize, pos: usize) -> usize {
   (pos + width) % length(width, height)
 }
 
-pub fn w(width: uint, pos: uint) -> uint {
+pub fn w(width: usize, pos: usize) -> usize {
   if pos % width == 0 {
     pos + width - 1
   } else {
@@ -91,7 +88,7 @@ pub fn w(width: uint, pos: uint) -> uint {
   }
 }
 
-pub fn e(width: uint, pos: uint) -> uint {
+pub fn e(width: usize, pos: usize) -> usize {
   if pos % width == width - 1 {
     pos - width + 1
   } else {
@@ -99,41 +96,41 @@ pub fn e(width: uint, pos: uint) -> uint {
   }
 }
 
-pub fn nw(width: uint, height: uint, pos: uint) -> uint {
+pub fn nw(width: usize, height: usize, pos: usize) -> usize {
   n(width, height, w(width, pos))
 }
 
-pub fn ne(width: uint, height: uint, pos: uint) -> uint {
+pub fn ne(width: usize, height: usize, pos: usize) -> usize {
   n(width, height, e(width, pos))
 }
 
-pub fn sw(width: uint, height: uint, pos: uint) -> uint {
+pub fn sw(width: usize, height: usize, pos: usize) -> usize {
   s(width, height, w(width, pos))
 }
 
-pub fn se(width: uint, height: uint, pos: uint) -> uint {
+pub fn se(width: usize, height: usize, pos: usize) -> usize {
   s(width, height, e(width, pos))
 }
 
-pub fn point_manhattan(width: uint, height: uint, point1: Point, point2: Point) -> uint {
-  let diff_x = (point1.x as int - point2.x as int).abs() as uint;
-  let diff_y = (point1.y as int - point2.y as int).abs() as uint;
+pub fn point_manhattan(width: usize, height: usize, point1: Point, point2: Point) -> usize {
+  let diff_x = (point1.x as i32 - point2.x as i32).abs() as usize;
+  let diff_y = (point1.y as i32 - point2.y as i32).abs() as usize;
   cmp::min(diff_x, width - diff_x) + cmp::min(diff_y, height - diff_y)
 }
 
-pub fn point_euclidean(width: uint, height: uint, point1: Point, point2: Point) -> uint {
-  let diff_x = (point1.x as int - point2.x as int).abs() as uint;
-  let diff_y = (point1.y as int - point2.y as int).abs() as uint;
+pub fn point_euclidean(width: usize, height: usize, point1: Point, point2: Point) -> usize {
+  let diff_x = (point1.x as i32 - point2.x as i32).abs() as usize;
+  let diff_y = (point1.y as i32 - point2.y as i32).abs() as usize;
   cmp::min(diff_x, width - diff_x).pow(2) + cmp::min(diff_y, height - diff_y).pow(2)
 }
 
-pub fn manhattan(width: uint, height: uint, pos1: uint, pos2: uint) -> uint {
+pub fn manhattan(width: usize, height: usize, pos1: usize, pos2: usize) -> usize {
   let point1 = from_pos(width, pos1);
   let point2 = from_pos(width, pos2);
   point_manhattan(width, height, point1, point2)
 }
 
-pub fn euclidean(width: uint, height: uint, pos1: uint, pos2: uint) -> uint {
+pub fn euclidean(width: usize, height: usize, pos1: usize, pos2: usize) -> usize {
   let point1 = from_pos(width, pos1);
   let point2 = from_pos(width, pos2);
   point_euclidean(width, height, point1, point2)

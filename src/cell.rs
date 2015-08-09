@@ -1,8 +1,8 @@
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Cell {
-  Anthill(uint),
-  AnthillWithAnt(uint),
-  Ant(uint),
+  Anthill(usize),
+  AnthillWithAnt(usize),
+  Ant(usize),
   Food,
   Land,
   Water,
@@ -30,7 +30,7 @@ pub fn is_ant(cell: Cell) -> bool {
   }
 }
 
-pub fn is_players_ant(cell: Cell, player: uint) -> bool {
+pub fn is_players_ant(cell: Cell, player: usize) -> bool {
   cell == Cell::Ant(player) || cell == Cell::AnthillWithAnt(player)
 }
 
@@ -54,7 +54,7 @@ pub fn is_our_anthill(cell: Cell) -> bool {
   cell == Cell::Anthill(0) || cell == Cell::AnthillWithAnt(0)
 }
 
-pub fn ant_owner(cell: Cell) -> Option<uint> {
+pub fn ant_owner(cell: Cell) -> Option<usize> {
   match cell {
     Cell::Ant(player) => Some(player),
     Cell::AnthillWithAnt(player) => Some(player),

@@ -6,12 +6,11 @@
 //TODO: 2. попыка вычислить итеративно точку равновесие Нэша - для своих стоящих на месте муравьев вычислить лучший ход противника, затем для этого лучшего хода вычислить наш лучший ход, и так далее. Делать так либо пока не достигнут предел итераций либо лучшие ответы перестанут меняться.
 //TODO: 3. в минимаксе вычислять не худший для нас, а лучший для врага ход. При этом придется отказаться от альфа-отсечния.
 
-use std::{int, uint};
-use std::cmp::*;
-use std::num::*;
-use std::iter::*;
-use std::collections::*;
-use rand::*;
+use std::cmp;
+use std::cmp::Ordering;
+use std::iter;
+use std::collections::LinkedList;
+use rand::{Rng, SeedableRng, XorShiftRng};
 use coordinates::*;
 use time::*;
 use wave::*;
@@ -20,106 +19,107 @@ use step::*;
 use input::*;
 use log::*;
 
-static TERRITORY_PATH_SIZE_CONST: uint = 5;
+const TERRITORY_PATH_SIZE_CONST: usize = 5;
 
-static APPROACH_PATH_SIZE_CONST: uint = 6;
+const APPROACH_PATH_SIZE_CONST: usize = 6;
 
-static ESCAPE_PATH_SIZE: uint = 8;
+const ESCAPE_PATH_SIZE: usize = 8;
 
-static GATHERING_FOOD_PATH_SIZE: uint = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
+const GATHERING_FOOD_PATH_SIZE: usize = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
 
-static ATTACK_ANTHILLS_PATH_SIZE: uint = 20; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
+const ATTACK_ANTHILLS_PATH_SIZE: usize = 20; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
 
-static DEFEND_ANTHILLS_PATH_SIZE: uint = 15;
+const DEFEND_ANTHILLS_PATH_SIZE: usize = 15;
 
-static DEFENDER_PATH_SIZE: uint = 20;
+const DEFENDER_PATH_SIZE: usize = 20;
 
-static ATTACK_ANTHILLS_ANTS_COUNT: uint = 2; // Максимальное количество наших муравьев, атакующих вражеские муравеники.
+const ATTACK_ANTHILLS_ANTS_COUNT: usize = 2; // Максимальное количество наших муравьев, атакующих вражеские муравеники.
 
-static DANGEROUS_ANTHILLS_COUNT: uint = 3; // Если муравейников больше этого количества, не защищаем их вообще.
+const DANGEROUS_ANTHILLS_COUNT: usize = 3; // Если муравейников больше этого количества, не защищаем их вообще.
 
-static DEFEND_ANTHILLS_COUNT: uint = 2; // Максимальное количество атакуемых своих муравейников, которые мы будем защищать.
+const DEFEND_ANTHILLS_COUNT: usize = 2; // Максимальное количество атакуемых своих муравейников, которые мы будем защищать.
 
-static MINIMAX_CRITICAL_TIME: uint = 100; // Если на ход осталось времени меньше этого количества миллисекунд, останавливаем минимакс и продолжаем вычислять ходы другими методами.
+const MINIMAX_CRITICAL_TIME: u32 = 100; // Если на ход осталось времени меньше этого количества миллисекунд, останавливаем минимакс и продолжаем вычислять ходы другими методами.
 
-static CRITICAL_TIME: uint = 50; // Если на ход осталось времени меньше этого количества миллисекунд, больше ничего не делаем, а только отдаем уже сделанные ходы.
+const CRITICAL_TIME: u32 = 50; // Если на ход осталось времени меньше этого количества миллисекунд, больше ничего не делаем, а только отдаем уже сделанные ходы.
 
-static ENEMIES_DEAD_ESTIMATION: &'static [uint] = &[3000, 4000, 6000, 9000, 12000, 18000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
+const ENEMIES_DEAD_ESTIMATION: &'static [usize] = &[3000, 4000, 6000, 9000, 12000, 18000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
 
-static OURS_DEAD_ESTIMATION: &'static [uint] = &[6000, 6000, 6000, 6000, 6000, 6000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
+const OURS_DEAD_ESTIMATION: &'static [usize] = &[6000, 6000, 6000, 6000, 6000, 6000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
 
-static OUR_FOOD_ESTIMATION: &'static [uint] = &[2000, 2000, 2000, 2000, 2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
+const OUR_FOOD_ESTIMATION: &'static [usize] = &[2000, 2000, 2000, 2000, 2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
 
-static ENEMY_FOOD_ESTIMATION: &'static [uint] = &[1000, 1500, 2000, 3000, 4000, 6000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
+const ENEMY_FOOD_ESTIMATION: &'static [usize] = &[1000, 1500, 2000, 3000, 4000, 6000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
 
-static DESTROYED_ENEMY_ANTHILL_ESTIMATION: &'static [uint] = &[50000, 50000, 50000, 50000, 50000, 50000];
+const DESTROYED_ENEMY_ANTHILL_ESTIMATION: &'static [usize] = &[50000, 50000, 50000, 50000, 50000, 50000];
 
-static DESTROYED_OUR_ANTHILL_ESTIMATION: &'static [uint] = &[50000, 50000, 50000, 50000, 50000, 50000];
+const DESTROYED_OUR_ANTHILL_ESTIMATION: &'static [usize] = &[50000, 50000, 50000, 50000, 50000, 50000];
 
-static DISTANCE_TO_ENEMIES_ESTIMATION: &'static [uint] = &[1, 1, 1, 1, 1, 1];
+const DISTANCE_TO_ENEMIES_ESTIMATION: &'static [usize] = &[1, 1, 1, 1, 1, 1];
 
-static STANDING_ANTS_CONST: uint = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
+const STANDING_ANTS_CONST: usize = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
 
-static STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST: uint = 4;
+const STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST: usize = 4;
 
-static NEIGHBORS_AGGRESSION: &'static [uint] = &[0, 0, 1, 1, 1, 2, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
+const NEIGHBORS_AGGRESSION: &'static [usize] = &[0, 0, 1, 1, 1, 2, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
 
-static OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: uint = 6; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
+const OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: usize = 6; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
 
-static OURS_ANTHILLS_AGGRESSION: uint = 2; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
+const OURS_ANTHILLS_AGGRESSION: usize = 2; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
 
 #[derive(Clone)]
 struct BoardCell {
-  ant: uint, // Номер игрока, чей муравей сделал ход в текущую клетку, плюс один.
-  attack: uint, // Количество врагов, атакующих муравья.
-  cycle: uint, // Клитка, из которой сделал ход муравей в текущую. Нужно для отсечения циклов (хождений муравьев по кругу).
+  ant: usize, // Номер игрока, чей муравей сделал ход в текущую клетку, плюс один.
+  attack: usize, // Количество врагов, атакующих муравья.
+  cycle: usize, // Клитка, из которой сделал ход муравей в текущую. Нужно для отсечения циклов (хождений муравьев по кругу).
   dead: bool // Помечаются флагом погибшие в битве свои и чужие муравьи.
 }
 
+#[derive(Clone)]
 pub struct Colony {
-  width: uint, // Ширина поля.
-  height: uint, // Высота поля.
-  turn_time: uint, // Время на один ход.
-  turns_count: uint, // Количество ходов в игре.
-  view_radius2: uint,
-  attack_radius2: uint,
-  spawn_radius2: uint,
-  cur_turn: uint, // Номер текущего хода.
+  width: usize, // Ширина поля.
+  height: usize, // Высота поля.
+  turn_time: u32, // Время на один ход.
+  turns_count: usize, // Количество ходов в игре.
+  view_radius2: usize,
+  attack_radius2: usize,
+  spawn_radius2: usize,
+  cur_turn: usize, // Номер текущего хода.
   start_time: u64, // Время начала хода.
   rng: XorShiftRng, // Генератор случайных чисел.
-  min_view_radius_manhattan: uint,
-  max_view_radius_manhattan: uint,
-  max_attack_radius_manhattan: uint,
-  enemies_count: uint, // Известное количество врагов.
+  min_view_radius_manhattan: usize,
+  max_view_radius_manhattan: usize,
+  max_attack_radius_manhattan: usize,
+  enemies_count: usize, // Известное количество врагов.
   world: Vec<Cell>, // Текущее состояние мира. При ходе нашего муравья он передвигается на новую клетку.
   last_world: Vec<Cell>, // Предыдущее состояние мира со сделавшими ход нашими муравьями.
-  visible_area: Vec<uint>, // Равняется 0 для видимых клеток и известной воды, для остальных увеличивается на 1 перед каждым ходом.
-  discovered_area: Vec<uint>,
-  standing_ants: Vec<uint>, // Каждый ход увеличивается на 1 для вражеских муравьев (при условии, что у них не изменилось окружение) и сбрасывается в 0 для всех остальных клеток. То есть показывает, сколько ходов на месте стоит вражеский муравей.
+  visible_area: Vec<usize>, // Равняется 0 для видимых клеток и известной воды, для остальных увеличивается на 1 перед каждым ходом.
+  discovered_area: Vec<usize>,
+  standing_ants: Vec<usize>, // Каждый ход увеличивается на 1 для вражеских муравьев (при условии, что у них не изменилось окружение) и сбрасывается в 0 для всех остальных клеток. То есть показывает, сколько ходов на месте стоит вражеский муравей.
   moved: Vec<bool>, // Помечаются флагом клетки, откуда сделал ход наш муравей, а также куда он сделал ход.
-  gathered_food: Vec<uint>, // Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1.
-  territory: Vec<uint>,
-  dangerous_place: Vec<uint>, // Количество вражеских муравьев, которые могут атаковать клетку на следующем ходу.
-  aggressive_place: Vec<uint>,
-  groups: Vec<uint>,
+  gathered_food: Vec<usize>, // Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1.
+  territory: Vec<usize>,
+  dangerous_place: Vec<usize>, // Количество вражеских муравьев, которые могут атаковать клетку на следующем ходу.
+  aggressive_place: Vec<usize>,
+  groups: Vec<usize>,
   fighting: Vec<bool>,
   board: Vec<BoardCell>,
-  tmp: Vec<uint>,
-  alone_ants: Vec<uint>,
+  tmp: Vec<usize>,
+  alone_ants: Vec<usize>,
   tags: Vec<Tag>, // Тэги для волнового алгоритма.
-  tagged: Vec<uint>, // Список позиций start_tags и path_tags с ненулевыми значениями.
+  tagged: Vec<usize>, // Список позиций start_tags и path_tags с ненулевыми значениями.
   tags2: Vec<Tag>, // Вторые тэги для волнового алгоритма.
-  tagged2: Vec<uint>, // Список позиций start_tags и path_tags во вторых тэгах с ненулевыми значениями.
-  ours_ants: Vec<uint>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
-  enemies_ants: Vec<uint>,
-  enemies_anthills: Vec<uint>,
-  ours_anthills: Vec<uint>, // Список клеток с нашими муравейниками (как в видимой области, так и за туманом войны).
-  food: Vec<uint>, // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
-  log: DList<LogMessage>
+  tagged2: Vec<usize>, // Список позиций start_tags и path_tags во вторых тэгах с ненулевыми значениями.
+  ours_ants: Vec<usize>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
+  enemies_ants: Vec<usize>,
+  enemies_anthills: Vec<usize>,
+  ours_anthills: Vec<usize>, // Список клеток с нашими муравейниками (как в видимой области, так и за туманом войны).
+  food: Vec<usize>, // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
+  log: LinkedList<LogMessage>
 }
 
 impl Colony {
-  pub fn new(width: uint, height: uint, turn_time: uint, turns_count: uint, view_radius2: uint, attack_radius2: uint, spawn_radius2: uint, seed: u64) -> Colony {
+  pub fn new(width: usize, height: usize, turn_time: u32, turns_count: usize, view_radius2: usize, attack_radius2: usize, spawn_radius2: usize, seed: u64) -> Colony {
     let len = length(width, height);
     Colony {
       width: width,
@@ -131,111 +131,111 @@ impl Colony {
       spawn_radius2: spawn_radius2,
       cur_turn: 0,
       start_time: get_time(),
-      rng: SeedableRng::from_seed([1, ((seed >> 32) & 0xFFFFFFFF) as u32, 3, (seed & 0xFFFFFFFF) as u32]),
-      min_view_radius_manhattan: (view_radius2 as f32).sqrt() as uint,
-      max_view_radius_manhattan: ((view_radius2 * 2) as f32).sqrt() as uint,
-      max_attack_radius_manhattan: ((attack_radius2 * 2) as f32).sqrt() as uint,
+      rng: XorShiftRng::from_seed([1, ((seed >> 32) & 0xFFFFFFFF) as u32, 3, (seed & 0xFFFFFFFF) as u32]),
+      min_view_radius_manhattan: (view_radius2 as f32).sqrt() as usize,
+      max_view_radius_manhattan: ((view_radius2 * 2) as f32).sqrt() as usize,
+      max_attack_radius_manhattan: ((attack_radius2 * 2) as f32).sqrt() as usize,
       enemies_count: 0,
-      world: repeat(Cell::Unknown).take(len).collect(),
-      last_world: repeat(Cell::Unknown).take(len).collect(),
-      visible_area: repeat(0u).take(len).collect(),
-      discovered_area: repeat(0u).take(len).collect(),
-      standing_ants: repeat(0u).take(len).collect(),
-      moved: repeat(false).take(len).collect(),
-      gathered_food: repeat(0u).take(len).collect(),
-      territory: repeat(0u).take(len).collect(),
-      dangerous_place: repeat(0u).take(len).collect(),
-      aggressive_place: repeat(0u).take(len).collect(),
-      groups: repeat(0u).take(len).collect(),
-      fighting: repeat(false).take(len).collect(),
-      board: repeat(BoardCell { ant: 0, attack: 0, cycle: 0, dead: false }).take(len).collect(),
-      tmp: repeat(0u).take(len).collect(),
+      world: iter::repeat(Cell::Unknown).take(len).collect(),
+      last_world: iter::repeat(Cell::Unknown).take(len).collect(),
+      visible_area: iter::repeat(0).take(len).collect(),
+      discovered_area: iter::repeat(0).take(len).collect(),
+      standing_ants: iter::repeat(0).take(len).collect(),
+      moved: iter::repeat(false).take(len).collect(),
+      gathered_food: iter::repeat(0).take(len).collect(),
+      territory: iter::repeat(0).take(len).collect(),
+      dangerous_place: iter::repeat(0).take(len).collect(),
+      aggressive_place: iter::repeat(0).take(len).collect(),
+      groups: iter::repeat(0).take(len).collect(),
+      fighting: iter::repeat(false).take(len).collect(),
+      board: iter::repeat(BoardCell { ant: 0, attack: 0, cycle: 0, dead: false }).take(len).collect(),
+      tmp: iter::repeat(0).take(len).collect(),
       alone_ants: Vec::with_capacity(len),
-      tags: repeat(Tag::new()).take(len).collect(),
+      tags: iter::repeat(Tag::new()).take(len).collect(),
       tagged: Vec::with_capacity(len),
-      tags2: repeat(Tag::new()).take(len).collect(),
+      tags2: iter::repeat(Tag::new()).take(len).collect(),
       tagged2: Vec::with_capacity(len),
       ours_ants: Vec::with_capacity(len),
       enemies_ants: Vec::with_capacity(len),
       enemies_anthills: Vec::with_capacity(len),
       ours_anthills: Vec::with_capacity(len),
       food: Vec::with_capacity(len),
-      log: DList::new()
+      log: LinkedList::new()
     }
   }
-  pub fn log(&self) -> &DList<LogMessage> {
+  pub fn log(&self) -> &LinkedList<LogMessage> {
     &self.log
   }
-  pub fn width(&self) -> uint {
+  pub fn width(&self) -> usize {
     self.width
   }
-  pub fn height(&self) -> uint {
+  pub fn height(&self) -> usize {
     self.height
   }
-  pub fn cur_turn(&self) -> uint {
+  pub fn cur_turn(&self) -> usize {
     self.cur_turn
   }
 }
 
-fn remove_ant(world: &mut Vec<Cell>, pos: uint) {
-  *world.get_mut(pos).unwrap() = match world[pos] {
+fn remove_ant(world: &mut Vec<Cell>, pos: usize) {
+  world[pos] = match world[pos] {
     Cell::AnthillWithAnt(player) => Cell::Anthill(player),
     _ => Cell::Land
   };
 }
 
-fn set_ant(world: &mut Vec<Cell>, pos: uint, player: uint) {
-  *world.get_mut(pos).unwrap() = if world[pos] == Cell::Anthill(player) { Cell::AnthillWithAnt(player) } else { Cell::Ant(player) };
+fn set_ant(world: &mut Vec<Cell>, pos: usize, player: usize) {
+  world[pos] = if world[pos] == Cell::Anthill(player) { Cell::AnthillWithAnt(player) } else { Cell::Ant(player) };
 }
 
-fn move_one(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut DList<Step>, pos: uint, next_pos: uint, log: &mut DList<LogMessage>) {
+fn move_one(width: usize, height: usize, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut LinkedList<Step>, pos: usize, next_pos: usize, log: &mut LinkedList<LogMessage>) {
   let direction = to_direction(width, height, pos, next_pos);
   if direction.is_none() {
     log.push_back(LogMessage::Jump(pos, next_pos));
     return;
   }
-  if !is_players_ant(world[pos].clone(), 0) {
+  if !is_players_ant(world[pos], 0) {
     log.push_back(LogMessage::Multitask(pos, next_pos));
     return;
   }
   remove_ant(world, pos);
-  *moved.get_mut(pos).unwrap() = true;
+  moved[pos] = true;
   set_ant(world, next_pos, 0);
-  *moved.get_mut(next_pos).unwrap() = true;
+  moved[next_pos] = true;
   output.push_back(Step { point: from_pos(width, pos), direction: direction.unwrap() })
 }
 
-fn move_all(width: uint, height: uint, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut DList<Step>, moves: &DList<(uint, uint)>, log: &mut DList<LogMessage>) {
-  for &(pos, next_pos) in moves.iter() {
-    if !is_players_ant(world[pos].clone(), 0) {
+fn move_all(width: usize, height: usize, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut LinkedList<Step>, moves: &LinkedList<(usize, usize)>, log: &mut LinkedList<LogMessage>) {
+  for &(pos, next_pos) in moves {
+    if !is_players_ant(world[pos], 0) {
       log.push_back(LogMessage::Multitask(pos, next_pos));
       continue;
     }
     remove_ant(world, pos);
-    *moved.get_mut(pos).unwrap() = true;
+    moved[pos] = true;
   }
-  for &(pos, next_pos) in moves.iter() {
+  for &(pos, next_pos) in moves {
     let direction = to_direction(width, height, pos, next_pos);
     if direction.is_none() {
       log.push_back(LogMessage::Jump(pos, next_pos));
       continue;
     }
     set_ant(world, next_pos, 0);
-    *moved.get_mut(next_pos).unwrap() = true;
+    moved[next_pos] = true;
     output.push_back(Step { point: from_pos(width, pos), direction: direction.unwrap() });
   }
 }
 
-fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint, world: &Vec<Cell>, discovered_area: &Vec<uint>, dangerous_place: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ant_pos: uint, rng: &mut XorShiftRng) -> Option<uint> {
-  let mut n_score = 0u;
-  let mut s_score = 0u;
-  let mut w_score = 0u;
-  let mut e_score = 0u;
+fn discover_direction(width: usize, height: usize, min_view_radius_manhattan: usize, world: &Vec<Cell>, discovered_area: &Vec<usize>, dangerous_place: &Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, ant_pos: usize, rng: &mut XorShiftRng) -> Option<usize> {
+  let mut n_score = 0;
+  let mut s_score = 0;
+  let mut w_score = 0;
+  let mut e_score = 0;
   let n_pos = n(width, height, ant_pos);
   let s_pos = s(width, height, ant_pos);
   let w_pos = w(width, ant_pos);
   let e_pos = e(width, ant_pos);
-  if is_free(world[n_pos].clone()) && dangerous_place[n_pos] == 0 {
+  if is_free(world[n_pos]) && dangerous_place[n_pos] == 0 {
     simple_wave(width, height, tags, tagged, n_pos, |pos, path_size, prev| {
       if pos == s(width, height, prev) || path_size > manhattan(width, height, n_pos, pos) || manhattan(width, height, n_pos, pos) > min_view_radius_manhattan || world[pos] == Cell::Water {
         false
@@ -248,7 +248,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
     }, |_, _, _| { false });
     clear_tags(tags, tagged);
   }
-  if is_free(world[s_pos].clone()) && dangerous_place[s_pos] == 0 {
+  if is_free(world[s_pos]) && dangerous_place[s_pos] == 0 {
     simple_wave(width, height, tags, tagged, s_pos, |pos, path_size, prev| {
       if pos == n(width, height, prev) || path_size > manhattan(width, height, s_pos, pos) || manhattan(width, height, s_pos, pos) > min_view_radius_manhattan || world[pos] == Cell::Water {
         false
@@ -261,7 +261,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
     }, |_, _, _| { false });
     clear_tags(tags, tagged);
   }
-  if is_free(world[w_pos].clone()) && dangerous_place[w_pos] == 0 {
+  if is_free(world[w_pos]) && dangerous_place[w_pos] == 0 {
     simple_wave(width, height, tags, tagged, w_pos, |pos, path_size, prev| {
       if pos == e(width, prev) || path_size > manhattan(width, height, w_pos, pos) || manhattan(width, height, w_pos, pos) > min_view_radius_manhattan || world[pos] == Cell::Water {
         false
@@ -274,7 +274,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
     }, |_, _, _| { false });
     clear_tags(tags, tagged);
   }
-  if is_free(world[e_pos].clone())  && dangerous_place[e_pos] == 0 {
+  if is_free(world[e_pos])  && dangerous_place[e_pos] == 0 {
     simple_wave(width, height, tags, tagged, e_pos, |pos, path_size, prev| {
       if pos == w(width, prev) || path_size > manhattan(width, height, e_pos, pos) || manhattan(width, height, e_pos, pos) > min_view_radius_manhattan || world[pos] == Cell::Water {
         false
@@ -311,7 +311,7 @@ fn discover_direction(width: uint, height: uint, min_view_radius_manhattan: uint
   }
 }
 
-fn discover(colony: &mut Colony, output: &mut DList<Step>) {
+fn discover(colony: &mut Colony, output: &mut LinkedList<Step>) {
   colony.log.push_back(LogMessage::Discover);
   let width = colony.width;
   let height = colony.height;
@@ -325,7 +325,7 @@ fn discover(colony: &mut Colony, output: &mut DList<Step>) {
       Some(next_pos) => {
         simple_wave(width, height, &mut colony.tags, &mut colony.tagged, next_pos, |pos, _, _| {
           if manhattan(width, height, pos, next_pos) <= min_view_radius_manhattan {
-            *discovered_area.get_mut(pos).unwrap() = 0;
+            discovered_area[pos] = 0;
             true
           } else {
             false
@@ -340,7 +340,7 @@ fn discover(colony: &mut Colony, output: &mut DList<Step>) {
   }
 }
 
-fn travel(colony: &mut Colony, output: &mut DList<Step>) {
+fn travel(colony: &mut Colony, output: &mut LinkedList<Step>) {
   colony.log.push_back(LogMessage::Travel);
   let width = colony.width;
   let height = colony.height;
@@ -349,40 +349,40 @@ fn travel(colony: &mut Colony, output: &mut DList<Step>) {
   let moved = &mut colony.moved;
   let tmp = &mut colony.tmp;
   let dangerous_place = &colony.dangerous_place;
-  let mut path = DList::new();
+  let mut path = LinkedList::new();
   for &ant_pos in colony.ours_ants.iter() {
     if moved[ant_pos] {
       continue;
     }
-    *tmp.get_mut(ant_pos).unwrap() = 1;
+    tmp[ant_pos] = 1;
     let goal = simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, prev| {
-      let cell = world[pos].clone();
+      let cell = world[pos];
       let is_column = tmp[prev];
-      if cell == Cell::Water || is_column == 1 && (moved[pos] && is_players_ant(cell.clone(), 0) || cell == Cell::Food || dangerous_place[pos] > 0 && pos != ant_pos) {
+      if cell == Cell::Water || is_column == 1 && (moved[pos] && is_players_ant(cell, 0) || cell == Cell::Food || dangerous_place[pos] > 0 && pos != ant_pos) {
         false
       } else {
-        *tmp.get_mut(pos).unwrap() = if is_players_ant(cell, 0) { is_column } else { 0 };
+        tmp[pos] = if is_players_ant(cell, 0) { is_column } else { 0 };
         true
       }
     }, |pos, _, _| { territory[pos] != 1 });
     if goal.is_none() {
       for &pos in colony.tagged.iter() {
-        *tmp.get_mut(pos).unwrap() = 0;
+        tmp[pos] = 0;
       }
       clear_tags(&mut colony.tags, &mut colony.tagged);
       continue;
     }
     find_path(&mut colony.tags, ant_pos, goal.unwrap(), &mut path);
     for &pos in colony.tagged.iter() {
-      *tmp.get_mut(pos).unwrap() = 0;
+      tmp[pos] = 0;
     }
     clear_tags(&mut colony.tags, &mut colony.tagged);
     let mut path_pos = ant_pos;
-    let mut moves = DList::new();
+    let mut moves = LinkedList::new();
     for &pos in path.iter() {
       moves.push_back((path_pos, pos));
       colony.log.push_back(LogMessage::Goal(path_pos, goal.unwrap()));
-      if !is_players_ant(world[pos].clone(), 0) {
+      if !is_players_ant(world[pos], 0) {
         break;
       }
       path_pos = pos;
@@ -398,10 +398,10 @@ fn calculate_territory(colony: &mut Colony) {
   wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_ants.iter().chain(colony.enemies_ants.iter()).chain(colony.enemies_anthills.iter()), |pos, start_pos, path_size, _| {
     if path_size <= territory_path_size && world[pos] != Cell::Water {
       match world[start_pos] {
-        Cell::AnthillWithAnt(player) => *territory.get_mut(pos).unwrap() = player + 1,
-        Cell::Ant(player) => *territory.get_mut(pos).unwrap() = player + 1,
-        Cell::Anthill(player) => *territory.get_mut(pos).unwrap() = player + 1,
-        _ => *territory.get_mut(pos).unwrap() = 1
+        Cell::AnthillWithAnt(player) => territory[pos] = player + 1,
+        Cell::Ant(player) => territory[pos] = player + 1,
+        Cell::Anthill(player) => territory[pos] = player + 1,
+        _ => territory[pos] = 1
       }
       true
     } else {
@@ -411,7 +411,7 @@ fn calculate_territory(colony: &mut Colony) {
   clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
-fn attack_anthills(colony: &mut Colony, output: &mut DList<Step>) {
+fn attack_anthills(colony: &mut Colony, output: &mut LinkedList<Step>) {
   colony.log.push_back(LogMessage::AttackAnthills);
   let width = colony.width;
   let height = colony.height;
@@ -426,10 +426,10 @@ fn attack_anthills(colony: &mut Colony, output: &mut DList<Step>) {
     }
     match world[pos] {
       Cell::Ant(0) | Cell::AnthillWithAnt(0) if !moved[pos] => {
-        if !is_free(world[prev].clone()) {
+        if !is_free(world[prev]) {
           false
         } else {
-          *tmp.get_mut(start_pos).unwrap() += 1;
+          tmp[start_pos] += 1;
           move_one(width, height, world, moved, output, pos, prev, log);
           log.push_back(LogMessage::Goal(pos, start_pos));
           true
@@ -441,11 +441,11 @@ fn attack_anthills(colony: &mut Colony, output: &mut DList<Step>) {
   }, |_, _, _, _| { false });
   clear_tags(&mut colony.tags, &mut colony.tagged);
   for &pos in colony.enemies_anthills.iter() {
-    *tmp.get_mut(pos).unwrap() = 0;
+    tmp[pos] = 0;
   }
 }
 
-fn gather_food(colony: &mut Colony, output: &mut DList<Step>) {
+fn gather_food(colony: &mut Colony, output: &mut LinkedList<Step>) {
   colony.log.push_back(LogMessage::GatherFood);
   let width = colony.width;
   let height = colony.height;
@@ -460,26 +460,26 @@ fn gather_food(colony: &mut Colony, output: &mut DList<Step>) {
     }
     let n_pos = n(width, height, pos);
     if world[n_pos] == Cell::Food && gathered_food[n_pos] == 0 {
-      *moved.get_mut(pos).unwrap() = true;
-      *gathered_food.get_mut(n_pos).unwrap() = pos + 1;
+      moved[pos] = true;
+      gathered_food[n_pos] = pos + 1;
       log.push_back(LogMessage::Goal(pos, n_pos));
     }
     let s_pos = s(width, height, pos);
     if world[s_pos] == Cell::Food && gathered_food[s_pos] == 0 {
-      *moved.get_mut(pos).unwrap() = true;
-      *gathered_food.get_mut(s_pos).unwrap() = pos + 1;
+      moved[pos] = true;
+      gathered_food[s_pos] = pos + 1;
       log.push_back(LogMessage::Goal(pos, s_pos));
     }
     let w_pos = w(width, pos);
     if world[w_pos] == Cell::Food && gathered_food[w_pos] == 0 {
-      *moved.get_mut(pos).unwrap() = true;
-      *gathered_food.get_mut(w_pos).unwrap() = pos + 1;
+      moved[pos] = true;
+      gathered_food[w_pos] = pos + 1;
       log.push_back(LogMessage::Goal(pos, w_pos));
     }
     let e_pos = e(width, pos);
     if world[e_pos] == Cell::Food && gathered_food[e_pos] == 0 {
-      *moved.get_mut(pos).unwrap() = true;
-      *gathered_food.get_mut(e_pos).unwrap() = pos + 1;
+      moved[pos] = true;
+      gathered_food[e_pos] = pos + 1;
       log.push_back(LogMessage::Goal(pos, e_pos));
     }
   }
@@ -489,11 +489,11 @@ fn gather_food(colony: &mut Colony, output: &mut DList<Step>) {
     }
     match world[pos] {
       Cell::Ant(0) | Cell::AnthillWithAnt(0) if gathered_food[start_pos] == 0 && !moved[pos] => {
-        if pos != start_pos && !is_free(world[prev].clone()) {
+        if pos != start_pos && !is_free(world[prev]) {
           false
         } else {
           move_one(width, height, world, moved, output, pos, prev, log);
-          *gathered_food.get_mut(start_pos).unwrap() = pos + 1;
+          gathered_food[start_pos] = pos + 1;
           log.push_back(LogMessage::Goal(pos, start_pos));
           true
         }
@@ -505,7 +505,7 @@ fn gather_food(colony: &mut Colony, output: &mut DList<Step>) {
   clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
-fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>) -> bool {
+fn in_one_group(width: usize, height: usize, pos1: usize, pos2: usize, attack_radius2: usize, world: &Vec<Cell>, moved: &Vec<bool>) -> bool {
   let distance = euclidean(width, height, pos1, pos2);
   if distance <= attack_radius2 {
     return true;
@@ -518,22 +518,22 @@ fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius
   let s_pos2 = s(width, height, pos2);
   let w_pos2 = w(width, pos2);
   let e_pos2 = e(width, pos2);
-  let n_pos1_cell = world[n_pos1].clone();
-  let s_pos1_cell = world[s_pos1].clone();
-  let w_pos1_cell = world[w_pos1].clone();
-  let e_pos1_cell = world[e_pos1].clone();
-  let n_pos2_cell = world[n_pos2].clone();
-  let s_pos2_cell = world[s_pos2].clone();
-  let w_pos2_cell = world[w_pos2].clone();
-  let e_pos2_cell = world[e_pos2].clone();
-  let n_pos1_busy = is_water_or_food(n_pos1_cell.clone()) || is_players_ant(n_pos1_cell.clone(), 0) && moved[n_pos1];
-  let s_pos1_busy = is_water_or_food(s_pos1_cell.clone()) || is_players_ant(s_pos1_cell.clone(), 0) && moved[s_pos1];
-  let w_pos1_busy = is_water_or_food(w_pos1_cell.clone()) || is_players_ant(w_pos1_cell.clone(), 0) && moved[w_pos1];
-  let e_pos1_busy = is_water_or_food(e_pos1_cell.clone()) || is_players_ant(e_pos1_cell.clone(), 0) && moved[e_pos1];
-  let n_pos2_busy = is_water_or_food(n_pos2_cell.clone()) || is_players_ant(n_pos2_cell.clone(), 0) && moved[n_pos2];
-  let s_pos2_busy = is_water_or_food(s_pos2_cell.clone()) || is_players_ant(s_pos2_cell.clone(), 0) && moved[s_pos2];
-  let w_pos2_busy = is_water_or_food(w_pos2_cell.clone()) || is_players_ant(w_pos2_cell.clone(), 0) && moved[w_pos2];
-  let e_pos2_busy = is_water_or_food(e_pos2_cell.clone()) || is_players_ant(e_pos2_cell.clone(), 0) && moved[e_pos2];
+  let n_pos1_cell = world[n_pos1];
+  let s_pos1_cell = world[s_pos1];
+  let w_pos1_cell = world[w_pos1];
+  let e_pos1_cell = world[e_pos1];
+  let n_pos2_cell = world[n_pos2];
+  let s_pos2_cell = world[s_pos2];
+  let w_pos2_cell = world[w_pos2];
+  let e_pos2_cell = world[e_pos2];
+  let n_pos1_busy = is_water_or_food(n_pos1_cell) || is_players_ant(n_pos1_cell, 0) && moved[n_pos1];
+  let s_pos1_busy = is_water_or_food(s_pos1_cell) || is_players_ant(s_pos1_cell, 0) && moved[s_pos1];
+  let w_pos1_busy = is_water_or_food(w_pos1_cell) || is_players_ant(w_pos1_cell, 0) && moved[w_pos1];
+  let e_pos1_busy = is_water_or_food(e_pos1_cell) || is_players_ant(e_pos1_cell, 0) && moved[e_pos1];
+  let n_pos2_busy = is_water_or_food(n_pos2_cell) || is_players_ant(n_pos2_cell, 0) && moved[n_pos2];
+  let s_pos2_busy = is_water_or_food(s_pos2_cell) || is_players_ant(s_pos2_cell, 0) && moved[s_pos2];
+  let w_pos2_busy = is_water_or_food(w_pos2_cell) || is_players_ant(w_pos2_cell, 0) && moved[w_pos2];
+  let e_pos2_busy = is_water_or_food(e_pos2_cell) || is_players_ant(e_pos2_cell, 0) && moved[e_pos2];
   if !n_pos2_busy && euclidean(width, height, pos1, n_pos2) <= attack_radius2 {
     return true;
   }
@@ -617,20 +617,20 @@ fn in_one_group(width: uint, height: uint, pos1: uint, pos2: uint, attack_radius
   false
 }
 
-fn find_near_ants(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, group: &mut DList<uint>, ours: bool) {
+fn find_near_ants(width: usize, height: usize, ant_pos: usize, attack_radius2: usize, world: &Vec<Cell>, moved: &Vec<bool>, groups: &mut Vec<usize>, group_index: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, group: &mut LinkedList<usize>, ours: bool) {
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, prev| {
     if groups[pos] == 0 && !moved[pos] {
       match world[pos] {
         Cell::Ant(0) | Cell::AnthillWithAnt(0) => {
           if ours && in_one_group(width, height, ant_pos, pos, attack_radius2, world, moved) {
             group.push_back(pos);
-            *groups.get_mut(pos).unwrap() = group_index;
+            groups[pos] = group_index;
           }
         },
         Cell::Ant(_) | Cell::AnthillWithAnt(_) => {
           if !ours && in_one_group(width, height, ant_pos, pos, attack_radius2, world, moved) {
             group.push_back(pos);
-            *groups.get_mut(pos).unwrap() = group_index;
+            groups[pos] = group_index;
           }
         },
         _ => { }
@@ -641,21 +641,21 @@ fn find_near_ants(width: uint, height: uint, ant_pos: uint, attack_radius2: uint
   clear_tags(tags, tagged);
 }
 
-fn group_enough(ours_moves_count: uint, enemies_count: uint) -> bool {
+fn group_enough(ours_moves_count: usize, enemies_count: usize) -> bool {
   ours_moves_count > 21 ||
   ours_moves_count > 15 && enemies_count > 4 ||
   ours_moves_count > 11 && enemies_count > 7
 }
 
-fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, world: &Vec<Cell>, moved: &Vec<bool>, dangerous_place: &Vec<uint>, standing_ants: &Vec<uint>, groups: &mut Vec<uint>, group_index: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, ours: &mut Vec<uint>, enemies: &mut Vec<uint>) -> uint {
+fn get_group(width: usize, height: usize, ant_pos: usize, attack_radius2: usize, world: &Vec<Cell>, moved: &Vec<bool>, dangerous_place: &Vec<usize>, standing_ants: &Vec<usize>, groups: &mut Vec<usize>, group_index: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, ours: &mut Vec<usize>, enemies: &mut Vec<usize>) -> usize {
   ours.clear();
   enemies.clear();
-  let mut ours_moves_count = 0u;
-  let mut enemies_count = 0u;
-  let mut ours_q = DList::new();
-  let mut enemies_q = DList::new();
+  let mut ours_moves_count = 0;
+  let mut enemies_count = 0;
+  let mut ours_q = LinkedList::new();
+  let mut enemies_q = LinkedList::new();
   ours_q.push_back(ant_pos);
-  *groups.get_mut(ant_pos).unwrap() = group_index;
+  groups[ant_pos] = group_index;
   while !ours_q.is_empty() && !group_enough(ours_moves_count, enemies_count) {
     let pos = ours_q.pop_front().unwrap();
     ours.push(pos);
@@ -671,12 +671,12 @@ fn get_group(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, wor
     }
   }
   for &pos in ours_q.iter().chain(enemies.iter()) {
-    *groups.get_mut(pos).unwrap() = 0;
+    groups[pos] = 0;
   }
   ours_moves_count
 }
 
-fn is_near_food(width: uint, height: uint, world: &Vec<Cell>, pos: uint) -> bool { //TODO: spawn_radius2
+fn is_near_food(width: usize, height: usize, world: &Vec<Cell>, pos: usize) -> bool { //TODO: spawn_radius2
   if world[n(width, height, pos)] == Cell::Food ||
      world[s(width, height, pos)] == Cell::Food ||
      world[w(width, pos)] == Cell::Food ||
@@ -687,12 +687,12 @@ fn is_near_food(width: uint, height: uint, world: &Vec<Cell>, pos: uint) -> bool
   }
 }
 
-fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board: &Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> bool {
+fn is_dead(width: usize, height: usize, ant_pos: usize, attack_radius2: usize, board: &Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) -> bool {
   let mut result = false;
   let attack_value = board[ant_pos].attack;
   let ant_number = board[ant_pos].ant;
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| { euclidean(width, height, ant_pos, pos) <= attack_radius2 }, |pos, _, _| {
-    let board_cell = board[pos].clone();
+    let board_cell = &board[pos];
     if board_cell.ant != 0 && board_cell.ant != ant_number && board_cell.attack <= attack_value {
       result = true;
       true
@@ -704,24 +704,24 @@ fn is_dead(width: uint, height: uint, ant_pos: uint, attack_radius2: uint, board
   result
 }
 
-fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, ants: &DList<uint>, other_ours: &Vec<uint>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, aggression: uint) -> int {
-  let mut ours_dead_count = 0u;
-  let mut enemies_dead_count = 0u;
-  let mut our_food = 0u;
-  let mut enemy_food = 0u;
-  let mut destroyed_enemy_anthills = 0u;
-  let mut destroyed_our_anthills = 0u;
-  let mut distance_to_enemies = 0u;
+fn estimate(width: usize, height: usize, world: &Vec<Cell>, attack_radius2: usize, ants: &LinkedList<usize>, other_ours: &Vec<usize>, board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, aggression: usize) -> isize {
+  let mut ours_dead_count = 0;
+  let mut enemies_dead_count = 0;
+  let mut our_food = 0;
+  let mut enemy_food = 0;
+  let mut destroyed_enemy_anthills = 0;
+  let mut destroyed_our_anthills = 0;
+  let mut distance_to_enemies = 0;
   for &ant_pos in ants.iter().chain(other_ours.iter()) {
     if board[ant_pos].ant == 0 {
       continue;
     }
     if is_dead(width, height, ant_pos, attack_radius2, board, tags, tagged) {
-      board.get_mut(ant_pos).unwrap().dead = true;
+      board[ant_pos].dead = true;
     }
   }
   for &ant_pos in ants.iter().chain(other_ours.iter()) {
-    let ant_board_cell = board[ant_pos].clone();
+    let ant_board_cell = &board[ant_pos];
     if ant_board_cell.ant == 0 {
       continue;
     }
@@ -736,12 +736,12 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
         if is_near_food(width, height, world, ant_pos) {
           our_food += 1;
         }
-        if is_enemy_anthill(world[ant_pos].clone()) {
+        if is_enemy_anthill(world[ant_pos]) {
           destroyed_enemy_anthills += 1;
         }
-        let mut min_distance_to_enemy = uint::MAX;
-        for &enemy_pos in ants.iter() {
-          let enemy_board_cell = board[enemy_pos].clone();
+        let mut min_distance_to_enemy = usize::max_value();
+        for &enemy_pos in ants {
+          let enemy_board_cell = &board[enemy_pos];
           if enemy_board_cell.ant < 2 || enemy_board_cell.dead {
             continue;
           }
@@ -750,29 +750,29 @@ fn estimate(width: uint, height: uint, world: &Vec<Cell>, attack_radius2: uint, 
             min_distance_to_enemy = cur_distance;
           }
         }
-        if min_distance_to_enemy != uint::MAX {
+        if min_distance_to_enemy != usize::max_value() {
           distance_to_enemies += min_distance_to_enemy;
         }
       } else {
         if is_near_food(width, height, world, ant_pos) {
           enemy_food += 1;
         }
-        if is_our_anthill(world[ant_pos].clone()) {
+        if is_our_anthill(world[ant_pos]) {
           destroyed_our_anthills += 1;
         }
       }
     }
   }
   for &ant_pos in ants.iter().chain(other_ours.iter()) {
-    board.get_mut(ant_pos).unwrap().dead = false;
+    board[ant_pos].dead = false;
   }
-  (enemies_dead_count * ENEMIES_DEAD_ESTIMATION[aggression]) as int - (ours_dead_count * OURS_DEAD_ESTIMATION[aggression]) as int +
-  (our_food * OUR_FOOD_ESTIMATION[aggression]) as int - (enemy_food * ENEMY_FOOD_ESTIMATION[aggression]) as int +
-  (destroyed_enemy_anthills * DESTROYED_ENEMY_ANTHILL_ESTIMATION[aggression]) as int - (destroyed_our_anthills * DESTROYED_OUR_ANTHILL_ESTIMATION[aggression]) as int -
-  (distance_to_enemies * DISTANCE_TO_ENEMIES_ESTIMATION[aggression]) as int //TODO: штраф своему муравью за стояние на муравейнике. штраф своему муравью за стояние на одном месте. близость врага к муравейнику. точное вычисление того, кому достанется еда.
+  (enemies_dead_count * ENEMIES_DEAD_ESTIMATION[aggression]) as isize - (ours_dead_count * OURS_DEAD_ESTIMATION[aggression]) as isize +
+  (our_food * OUR_FOOD_ESTIMATION[aggression]) as isize - (enemy_food * ENEMY_FOOD_ESTIMATION[aggression]) as isize +
+  (destroyed_enemy_anthills * DESTROYED_ENEMY_ANTHILL_ESTIMATION[aggression]) as isize - (destroyed_our_anthills * DESTROYED_OUR_ANTHILL_ESTIMATION[aggression]) as isize -
+  (distance_to_enemies * DISTANCE_TO_ENEMIES_ESTIMATION[aggression]) as isize //TODO: штраф своему муравью за стояние на муравейнике. штраф своему муравью за стояние на одном месте. близость врага к муравейнику. точное вычисление того, кому достанется еда.
 }
 
-fn get_chain_begin(mut pos: uint, board: &Vec<BoardCell>) -> uint {
+fn get_chain_begin(mut pos: usize, board: &Vec<BoardCell>) -> usize {
   loop {
     let next_pos = board[pos].cycle;
     if next_pos == 0 {
@@ -783,8 +783,8 @@ fn get_chain_begin(mut pos: uint, board: &Vec<BoardCell>) -> uint {
   pos
 }
 
-fn get_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>) -> uint {
-  let mut result = 1u;
+fn get_moves_count(width: usize, height: usize, pos: usize, world: &Vec<Cell>, dangerous_place: &Vec<usize>) -> usize {
+  let mut result = 1;
   let mut escape = false;
   if dangerous_place[pos] == 0 {
     escape = true;
@@ -793,7 +793,7 @@ fn get_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
   let s_pos = s(width, height, pos);
   let w_pos = w(width, pos);
   let e_pos = e(width, pos);
-  if !is_water_or_food(world[n_pos].clone()) {
+  if !is_water_or_food(world[n_pos]) {
     if dangerous_place[n_pos] == 0 {
       if !escape {
         result += 1;
@@ -803,7 +803,7 @@ fn get_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
       result += 1;
     }
   }
-  if !is_water_or_food(world[w_pos].clone()) {
+  if !is_water_or_food(world[w_pos]) {
     if dangerous_place[w_pos] == 0 {
       if !escape {
         result += 1;
@@ -813,7 +813,7 @@ fn get_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
       result += 1;
     }
   }
-  if !is_water_or_food(world[s_pos].clone()) {
+  if !is_water_or_food(world[s_pos]) {
     if dangerous_place[s_pos] == 0 {
       if !escape {
         result += 1;
@@ -823,7 +823,7 @@ fn get_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
       result += 1;
     }
   }
-  if !is_water_or_food(world[e_pos].clone()) {
+  if !is_water_or_food(world[e_pos]) {
     if dangerous_place[e_pos] == 0 {
       if !escape {
         result += 1;
@@ -835,8 +835,8 @@ fn get_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
   result
 }
 
-fn get_escape_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>) -> uint {
-  let mut result = 0u;
+fn get_escape_moves_count(width: usize, height: usize, pos: usize, world: &Vec<Cell>, dangerous_place: &Vec<usize>) -> usize {
+  let mut result = 0;
   if dangerous_place[pos] == 0 {
     result += 1;
   }
@@ -844,22 +844,22 @@ fn get_escape_moves_count(width: uint, height: uint, pos: uint, world: &Vec<Cell
   let s_pos = s(width, height, pos);
   let w_pos = w(width, pos);
   let e_pos = e(width, pos);
-  if !is_water_or_food(world[n_pos].clone()) && dangerous_place[n_pos] == 0 {
+  if !is_water_or_food(world[n_pos]) && dangerous_place[n_pos] == 0 {
     result += 1;
   }
-  if !is_water_or_food(world[w_pos].clone()) && dangerous_place[w_pos] == 0 {
+  if !is_water_or_food(world[w_pos]) && dangerous_place[w_pos] == 0 {
     result += 1;
   }
-  if !is_water_or_food(world[s_pos].clone()) && dangerous_place[s_pos] == 0 {
+  if !is_water_or_food(world[s_pos]) && dangerous_place[s_pos] == 0 {
     result += 1;
   }
-  if !is_water_or_food(world[e_pos].clone()) && dangerous_place[e_pos] == 0 {
+  if !is_water_or_food(world[e_pos]) && dangerous_place[e_pos] == 0 {
     result += 1;
   }
   result
 }
 
-fn get_our_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>, board: &Vec<BoardCell>, moves: &mut DList<uint>) {
+fn get_our_moves(width: usize, height: usize, pos: usize, world: &Vec<Cell>, dangerous_place: &Vec<usize>, board: &Vec<BoardCell>, moves: &mut LinkedList<usize>) {
   let mut escape = false;
   if board[pos].ant == 0 {
     moves.push_back(pos);
@@ -871,9 +871,9 @@ fn get_our_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, danger
   let s_pos = s(width, height, pos);
   let w_pos = w(width, pos);
   let e_pos = e(width, pos);
-  let n_cell = world[n_pos].clone();
+  let n_cell = world[n_pos];
   let chain_begin = get_chain_begin(pos, board);
-  if !is_water_or_food(n_cell.clone()) && !is_ant(n_cell.clone()) && board[n_pos].ant == 0 && n_pos != chain_begin {
+  if !is_water_or_food(n_cell) && !is_ant(n_cell) && board[n_pos].ant == 0 && n_pos != chain_begin {
     if dangerous_place[n_pos] == 0 {
       if !escape {
         moves.push_back(n_pos);
@@ -883,8 +883,8 @@ fn get_our_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, danger
       moves.push_back(n_pos);
     }
   }
-  let w_cell = world[w_pos].clone();
-  if !is_water_or_food(w_cell.clone()) && !is_ant(w_cell.clone()) && board[w_pos].ant == 0 && w_pos != chain_begin {
+  let w_cell = world[w_pos];
+  if !is_water_or_food(w_cell) && !is_ant(w_cell) && board[w_pos].ant == 0 && w_pos != chain_begin {
     if dangerous_place[w_pos] == 0 {
       if !escape {
         moves.push_back(w_pos);
@@ -894,8 +894,8 @@ fn get_our_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, danger
       moves.push_back(w_pos);
     }
   }
-  let s_cell = world[s_pos].clone();
-  if !is_water_or_food(s_cell.clone()) && !is_ant(s_cell.clone()) && board[s_pos].ant == 0 && s_pos != chain_begin {
+  let s_cell = world[s_pos];
+  if !is_water_or_food(s_cell) && !is_ant(s_cell) && board[s_pos].ant == 0 && s_pos != chain_begin {
     if dangerous_place[s_pos] == 0 {
       if !escape {
         moves.push_back(s_pos);
@@ -905,8 +905,8 @@ fn get_our_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, danger
       moves.push_back(s_pos);
     }
   }
-  let e_cell = world[e_pos].clone();
-  if !is_water_or_food(e_cell.clone()) && !is_ant(e_cell.clone()) && board[e_pos].ant == 0 && e_pos != chain_begin {
+  let e_cell = world[e_pos];
+  if !is_water_or_food(e_cell) && !is_ant(e_cell) && board[e_pos].ant == 0 && e_pos != chain_begin {
     if dangerous_place[e_pos] == 0 {
       if !escape {
         moves.push_back(e_pos);
@@ -918,7 +918,7 @@ fn get_our_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, danger
 }
 
 // Рассматриваем также дополнительно сбегающие ходы на наши муравейники. Для своих муравьев такое делать не нужно, так как атака муравейников идет до сражения.
-fn get_enemy_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>, board: &Vec<BoardCell>, standing_ants: &Vec<uint>, moves: &mut DList<uint>) {
+fn get_enemy_moves(width: usize, height: usize, pos: usize, world: &Vec<Cell>, dangerous_place: &Vec<usize>, board: &Vec<BoardCell>, standing_ants: &Vec<usize>, moves: &mut LinkedList<usize>) {
   let mut escape = false;
   if board[pos].ant == 0 {
     moves.push_back(pos);
@@ -933,9 +933,9 @@ fn get_enemy_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
   let s_pos = s(width, height, pos);
   let w_pos = w(width, pos);
   let e_pos = e(width, pos);
-  let n_cell = world[n_pos].clone();
+  let n_cell = world[n_pos];
   let chain_begin = get_chain_begin(pos, board);
-  if !is_water_or_food(n_cell.clone()) && !is_players_ant(n_cell.clone(), 0) && board[n_pos].ant == 0 && n_pos != chain_begin {
+  if !is_water_or_food(n_cell) && !is_players_ant(n_cell, 0) && board[n_pos].ant == 0 && n_pos != chain_begin {
     if dangerous_place[n_pos] == 0 {
       if !escape || n_cell == Cell::Anthill(0) {
         moves.push_back(n_pos);
@@ -945,8 +945,8 @@ fn get_enemy_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
       moves.push_back(n_pos);
     }
   }
-  let w_cell = world[w_pos].clone();
-  if !is_water_or_food(w_cell.clone()) && !is_players_ant(w_cell.clone(), 0) && board[w_pos].ant == 0 && w_pos != chain_begin {
+  let w_cell = world[w_pos];
+  if !is_water_or_food(w_cell) && !is_players_ant(w_cell, 0) && board[w_pos].ant == 0 && w_pos != chain_begin {
     if dangerous_place[w_pos] == 0 {
       if !escape || w_cell == Cell::Anthill(0) {
         moves.push_back(w_pos);
@@ -956,8 +956,8 @@ fn get_enemy_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
       moves.push_back(w_pos);
     }
   }
-  let s_cell = world[s_pos].clone();
-  if !is_water_or_food(s_cell.clone()) && !is_players_ant(s_cell.clone(), 0) && board[s_pos].ant == 0 && s_pos != chain_begin {
+  let s_cell = world[s_pos];
+  if !is_water_or_food(s_cell) && !is_players_ant(s_cell, 0) && board[s_pos].ant == 0 && s_pos != chain_begin {
     if dangerous_place[s_pos] == 0 {
       if !escape || s_cell == Cell::Anthill(0) {
         moves.push_back(s_pos);
@@ -967,8 +967,8 @@ fn get_enemy_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
       moves.push_back(s_pos);
     }
   }
-  let e_cell = world[e_pos].clone();
-  if !is_water_or_food(e_cell.clone()) && !is_players_ant(e_cell.clone(), 0) && board[e_pos].ant == 0 && e_pos != chain_begin {
+  let e_cell = world[e_pos];
+  if !is_water_or_food(e_cell) && !is_players_ant(e_cell, 0) && board[e_pos].ant == 0 && e_pos != chain_begin {
     if dangerous_place[e_pos] == 0 {
       if !escape || e_cell == Cell::Anthill(0) {
         moves.push_back(e_pos);
@@ -979,7 +979,7 @@ fn get_enemy_moves(width: uint, height: uint, pos: uint, world: &Vec<Cell>, dang
   }
 }
 
-fn is_minimax_timeout(start_time: u64, turn_time: uint, log: &mut DList<LogMessage>) -> bool {
+fn is_minimax_timeout(start_time: u64, turn_time: u32, log: &mut LinkedList<LogMessage>) -> bool {
   if elapsed_time(start_time) + MINIMAX_CRITICAL_TIME > turn_time {
     log.push_back(LogMessage::MinimaxTimeout);
     true
@@ -988,25 +988,27 @@ fn is_minimax_timeout(start_time: u64, turn_time: uint, log: &mut DList<LogMessa
   }
 }
 
-fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, enemies: &Vec<uint>, other_ours: &Vec<uint>, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: int, start_time: u64, turn_time: uint, aggression: uint, log: &mut DList<LogMessage>) -> int {
+fn minimax_min(width: usize, height: usize, idx: usize, minimax_moved: &mut LinkedList<usize>, enemies: &Vec<usize>, other_ours: &Vec<usize>, world: &Vec<Cell>, dangerous_place_for_enemies: &Vec<usize>, attack_radius2: usize, board: &mut Vec<BoardCell>, standing_ants: &Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, alpha: isize, start_time: u64, turn_time: u32, aggression: usize, log: &mut LinkedList<LogMessage>) -> isize {
   if idx < enemies.len() {
     let pos = enemies[idx];
-    let mut moves = DList::new();
+    let mut moves = LinkedList::new();
     get_enemy_moves(width, height, pos, world, dangerous_place_for_enemies, board, standing_ants, &mut moves);
-    let mut min_estimate = int::MAX;
+    let mut min_estimate = isize::max_value();
     for &next_pos in moves.iter() {
-      if is_minimax_timeout(start_time, turn_time, log) { return int::MIN; }
+      if is_minimax_timeout(start_time, turn_time, log) {
+        return isize::min_value();
+      }
       minimax_moved.push_back(next_pos);
-      let ant_number = ant_owner(world[pos].clone()).unwrap() + 1;
-      board.get_mut(next_pos).unwrap().ant = ant_number;
-      board.get_mut(next_pos).unwrap().cycle = pos + 1;
-      board.get_mut(next_pos).unwrap().attack = dangerous_place_for_enemies[next_pos];
+      let ant_number = ant_owner(world[pos]).unwrap() + 1;
+      board[next_pos].ant = ant_number;
+      board[next_pos].cycle = pos + 1;
+      board[next_pos].attack = dangerous_place_for_enemies[next_pos];
       simple_wave(width, height, tags, tagged, next_pos, |pos, _, _| {
         if euclidean(width, height, next_pos, pos) <= attack_radius2 {
           if board[pos].ant != 0 && board[pos].ant != ant_number {
-            board.get_mut(pos).unwrap().attack += 1;
+            board[pos].attack += 1;
             if board[pos].ant != 1 {
-              board.get_mut(next_pos).unwrap().attack += 1;
+              board[next_pos].attack += 1;
             }
           }
           true
@@ -1018,7 +1020,7 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
       let cur_estimate = minimax_min(width, height, idx + 1, minimax_moved, enemies, other_ours, world, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, start_time, turn_time, aggression, log);
       simple_wave(width, height, tags, tagged, next_pos, |pos, _, _| {
         if euclidean(width, height, next_pos, pos) <= attack_radius2 {
-          let board_cell = board.get_mut(pos).unwrap();
+          let board_cell = &mut board[pos];
           if board_cell.ant != 0 && board_cell.ant != ant_number {
             board_cell.attack -= 1;
           }
@@ -1028,9 +1030,9 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
         }
       }, |_, _, _| { false });
       clear_tags(tags, tagged);
-      board.get_mut(next_pos).unwrap().attack = 0;
-      board.get_mut(next_pos).unwrap().ant = 0;
-      board.get_mut(next_pos).unwrap().cycle = 0;
+      board[next_pos].attack = 0;
+      board[next_pos].ant = 0;
+      board[next_pos].cycle = 0;
       minimax_moved.pop_back();
       if cur_estimate < min_estimate {
         min_estimate = cur_estimate;
@@ -1045,21 +1047,21 @@ fn minimax_min(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
   }
 }
 
-fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<uint>, ours: &Vec<uint>, enemies: &mut Vec<uint>, other_ours: &Vec<uint>, world: &Vec<Cell>, dangerous_place: &Vec<uint>, dangerous_place_for_enemies: &mut Vec<uint>, attack_radius2: uint, board: &mut Vec<BoardCell>, standing_ants: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>, alpha: &mut int, aggression: uint, start_time: u64, turn_time: uint, best_moves: &mut Vec<uint>, log: &mut DList<LogMessage>) {
+fn minimax_max(width: usize, height: usize, idx: usize, minimax_moved: &mut LinkedList<usize>, ours: &Vec<usize>, enemies: &mut Vec<usize>, other_ours: &Vec<usize>, world: &Vec<Cell>, dangerous_place: &Vec<usize>, dangerous_place_for_enemies: &mut Vec<usize>, attack_radius2: usize, board: &mut Vec<BoardCell>, standing_ants: &Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, alpha: &mut isize, aggression: usize, start_time: u64, turn_time: u32, best_moves: &mut Vec<usize>, log: &mut LinkedList<LogMessage>) {
   if idx < ours.len() {
     let pos = ours[idx];
-    let mut moves = DList::new();
+    let mut moves = LinkedList::new();
     get_our_moves(width, height, pos, world, dangerous_place, board, &mut moves);
     for &next_pos in moves.iter() {
       if is_minimax_timeout(start_time, turn_time, log) { return; }
       minimax_moved.push_back(next_pos);
-      board.get_mut(next_pos).unwrap().ant = 1;
-      board.get_mut(next_pos).unwrap().cycle = pos + 1;
+      board[next_pos].ant = 1;
+      board[next_pos].cycle = pos + 1;
       add_attack(width, height, attack_radius2, next_pos, dangerous_place_for_enemies, tags, tagged);
       minimax_max(width, height, idx + 1, minimax_moved, ours, enemies, other_ours, world, dangerous_place, dangerous_place_for_enemies, attack_radius2, board, standing_ants, tags, tagged, alpha, aggression, start_time, turn_time, best_moves, log);
       remove_attack(width, height, attack_radius2, next_pos, dangerous_place_for_enemies, tags, tagged);
-      board.get_mut(next_pos).unwrap().ant = 0;
-      board.get_mut(next_pos).unwrap().cycle = 0;
+      board[next_pos].ant = 0;
+      board[next_pos].cycle = 0;
       minimax_moved.pop_back();
     }
   } else {
@@ -1087,11 +1089,11 @@ fn minimax_max(width: uint, height: uint, idx: uint, minimax_moved: &mut DList<u
   }
 }
 
-fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, ant_pos: uint, enemies: &Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> bool {
-  for &enemy_pos in enemies.iter() {
+fn is_alone(width: usize, height: usize, attack_radius2: usize, world: &Vec<Cell>, ant_pos: usize, enemies: &Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) -> bool {
+  for &enemy_pos in enemies {
     let result = simple_wave(width, height, tags, tagged, enemy_pos, |_, _, prev| {
       euclidean(width, height, enemy_pos, prev) <= attack_radius2
-    }, |pos, _, _| { pos != ant_pos && is_players_ant(world[pos].clone(), 0) });
+    }, |pos, _, _| { pos != ant_pos && is_players_ant(world[pos], 0) });
     clear_tags(tags, tagged);
     if !result.is_none() {
       return false;
@@ -1100,21 +1102,21 @@ fn is_alone(width: uint, height: uint, attack_radius2: uint, world: &Vec<Cell>, 
   true
 }
 
-fn log_ants<'r, T: Iterator<Item=&'r uint>>(ants: &mut T) -> Box<DList<uint>> {
-  let mut result = box DList::new();
+fn log_ants<'r, T: Iterator<Item=&'r usize>>(ants: &mut T) -> Box<LinkedList<usize>> {
+  let mut result = Box::new(LinkedList::new());
   for &ant in ants {
     result.push_back(ant);
   }
   result
 }
 
-fn get_other_ours(width: uint, height: uint, world: &Vec<Cell>, groups: &Vec<uint>, tmp: &mut Vec<uint>, group_index: uint, attack_radius2: uint, enemies: &Vec<uint>, other_ours: &mut Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) {
+fn get_other_ours(width: usize, height: usize, world: &Vec<Cell>, groups: &Vec<usize>, tmp: &mut Vec<usize>, group_index: usize, attack_radius2: usize, enemies: &Vec<usize>, other_ours: &mut Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
   other_ours.clear();
-  for &enemy_pos in enemies.iter() {
+  for &enemy_pos in enemies {
     simple_wave(width, height, tags, tagged, enemy_pos, |pos, _, prev| {
       if euclidean(width, height, enemy_pos, prev) <= attack_radius2 {
-        if is_players_ant(world[pos].clone(), 0) && groups[pos] != group_index && tmp[pos] == 0 {
-          *tmp.get_mut(pos).unwrap() = 1;
+        if is_players_ant(world[pos], 0) && groups[pos] != group_index && tmp[pos] == 0 {
+          tmp[pos] = 1;
           other_ours.push(pos);
         }
         true
@@ -1125,14 +1127,14 @@ fn get_other_ours(width: uint, height: uint, world: &Vec<Cell>, groups: &Vec<uin
     clear_tags(tags, tagged);
   }
   for &ant_pos in other_ours.iter() {
-    *tmp.get_mut(ant_pos).unwrap() = 0;
+    tmp[ant_pos] = 0;
   }
 }
 
-fn add_attack(width: uint, height: uint, attack_radius2: uint, ant_pos: uint, attack_place: &mut Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) {
+fn add_attack(width: usize, height: usize, attack_radius2: usize, ant_pos: usize, attack_place: &mut Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
     if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
-      *attack_place.get_mut(pos).unwrap() += 1;
+      attack_place[pos] += 1;
       true
     } else {
       false
@@ -1141,10 +1143,10 @@ fn add_attack(width: uint, height: uint, attack_radius2: uint, ant_pos: uint, at
   clear_tags(tags, tagged);
 }
 
-fn remove_attack(width: uint, height: uint, attack_radius2: uint, ant_pos: uint, attack_place: &mut Vec<uint>, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) {
+fn remove_attack(width: usize, height: usize, attack_radius2: usize, ant_pos: usize, attack_place: &mut Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
     if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
-      *attack_place.get_mut(pos).unwrap() -= 1;
+      attack_place[pos] -= 1;
       true
     } else {
       false
@@ -1153,12 +1155,12 @@ fn remove_attack(width: uint, height: uint, attack_radius2: uint, ant_pos: uint,
   clear_tags(tags, tagged);
 }
 
-fn attack(colony: &mut Colony, output: &mut DList<Step>) {
+fn attack(colony: &mut Colony, output: &mut LinkedList<Step>) {
   colony.log.push_back(LogMessage::Attack);
   let mut ours = Vec::new();
   let mut other_ours = Vec::new();
   let mut enemies = Vec::new();
-  let mut minimax_moved = DList::new();
+  let mut minimax_moved = LinkedList::new();
   let mut best_moves = Vec::new();
   let mut group_index = 1;
   for &pos in colony.ours_ants.iter() {
@@ -1169,7 +1171,7 @@ fn attack(colony: &mut Colony, output: &mut DList<Step>) {
     let ours_moves_count = get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
     if !enemies.is_empty() {
-      let mut aggression = 0u;
+      let mut aggression = 0;
       for &pos in ours.iter() {
         if colony.aggressive_place[pos] > aggression {
           aggression = colony.aggressive_place[pos];
@@ -1181,7 +1183,7 @@ fn attack(colony: &mut Colony, output: &mut DList<Step>) {
       }
       colony.log.push_back(LogMessage::Group(group_index));
       colony.log.push_back(LogMessage::GroupSize(ours_moves_count, enemies.len()));
-      let mut alpha = int::MIN;
+      let mut alpha = isize::min_value();
       colony.log.push_back(LogMessage::Aggression(aggression));
       ours.sort_by(|&pos1, &pos2| {
         let pos1_dangerous = colony.dangerous_place[pos1] > 0;
@@ -1205,47 +1207,47 @@ fn attack(colony: &mut Colony, output: &mut DList<Step>) {
       colony.log.push_back(LogMessage::OtherOursAnts(log_ants(&mut other_ours.iter())));
       for &pos in other_ours.iter() {
         add_attack(colony.width, colony.height, colony.attack_radius2, pos, &mut colony.tmp, &mut colony.tags, &mut colony.tagged);
-        colony.board.get_mut(pos).unwrap().ant = 1;
+        colony.board[pos].ant = 1;
       }
       minimax_max(colony.width, colony.height, 0, &mut minimax_moved, &ours, &mut enemies, &other_ours, &colony.world, &colony.dangerous_place, &mut colony.tmp, colony.attack_radius2, &mut colony.board, &colony.standing_ants, &mut colony.tags, &mut colony.tagged, &mut alpha, aggression, colony.start_time, colony.turn_time, &mut best_moves, &mut colony.log);
       colony.log.push_back(LogMessage::Estimate(alpha));
       for &pos in other_ours.iter() {
         remove_attack(colony.width, colony.height, colony.attack_radius2, pos, &mut colony.tmp, &mut colony.tags, &mut colony.tagged);
-        colony.board.get_mut(pos).unwrap().ant = 0;
+        colony.board[pos].ant = 0;
       }
       for &pos in ours.iter() {
         set_ant(&mut colony.world, pos, 0);
       }
-      if alpha != int::MIN {
-        let mut moves = DList::new();
-        for i in range(0u, ours.len()) {
+      if alpha != isize::min_value() {
+        let mut moves = LinkedList::new();
+        for i in 0 .. ours.len() {
           let pos = ours[i];
           let next_pos = best_moves[i];
           if pos == next_pos {
-            *colony.moved.get_mut(pos).unwrap() = true;
+            colony.moved[pos] = true;
           } else {
             moves.push_back((pos, next_pos));
           }
         }
         move_all(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, &moves, &mut colony.log);
         for &pos in enemies.iter() {
-          *colony.fighting.get_mut(pos).unwrap() = true;
+          colony.fighting[pos] = true;
         }
       }
     }
   }
 }
 
-fn escape_estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>, estimate_pos: uint, tags: &mut Vec<Tag>, tagged: &mut Vec<uint>) -> int {
+fn escape_estimate(width: usize, height: usize, world: &Vec<Cell>, dangerous_place: &Vec<usize>, estimate_pos: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) -> isize {
   let mut estimate = 0;
   simple_wave(width, height, tags, tagged, estimate_pos, |pos, path_size, _| {
-    let cell = world[pos].clone();
+    let cell = world[pos];
     if path_size > ESCAPE_PATH_SIZE || cell == Cell::Water {
       false
     } else {
-      estimate += (ESCAPE_PATH_SIZE + 1 - path_size) as int * if is_enemy_ant(cell.clone()) { //TODO: Move to constants.
+      estimate += (ESCAPE_PATH_SIZE + 1 - path_size) as isize * if is_enemy_ant(cell) { //TODO: Move to constants.
         -7
-      } else if is_players_ant(cell.clone(), 0) {
+      } else if is_players_ant(cell, 0) {
         7
       } else if cell == Cell::Food {
         3
@@ -1261,7 +1263,7 @@ fn escape_estimate(width: uint, height: uint, world: &Vec<Cell>, dangerous_place
   estimate
 }
 
-fn escape(colony: &mut Colony, output: &mut DList<Step>) {
+fn escape(colony: &mut Colony, output: &mut LinkedList<Step>) {
   colony.log.push_back(LogMessage::Escape);
   let mut moves = Vec::with_capacity(5);
   let mut safe_moves = Vec::with_capacity(5);
@@ -1276,20 +1278,20 @@ fn escape(colony: &mut Colony, output: &mut DList<Step>) {
     let s_pos = s(colony.width, colony.height, ant_pos);
     let w_pos = w(colony.width, ant_pos);
     let e_pos = e(colony.width, ant_pos);
-    if is_free(colony.world[n_pos].clone()) {
+    if is_free(colony.world[n_pos]) {
       moves.push(n_pos);
     }
-    if is_free(colony.world[s_pos].clone()) {
+    if is_free(colony.world[s_pos]) {
       moves.push(s_pos);
     }
-    if is_free(colony.world[w_pos].clone()) {
+    if is_free(colony.world[w_pos]) {
       moves.push(w_pos);
     }
-    if is_free(colony.world[e_pos].clone()) {
+    if is_free(colony.world[e_pos]) {
       moves.push(e_pos);
     }
     if moves.is_empty() {
-      *colony.moved.get_mut(ant_pos).unwrap() = true;
+      colony.moved[ant_pos] = true;
       colony.log.push_back(LogMessage::Goal(ant_pos, ant_pos));
       continue;
     }
@@ -1302,7 +1304,7 @@ fn escape(colony: &mut Colony, output: &mut DList<Step>) {
     if safe_moves.is_empty() {
       next_pos = moves[0];
       let mut min_danger = colony.dangerous_place[moves[0]];
-      for i in range(1u, moves.len()) {
+      for i in 1 .. moves.len() {
         let cur_danger = colony.dangerous_place[moves[i]];
         if cur_danger < min_danger || cur_danger == min_danger && colony.rng.gen() {
           min_danger = cur_danger;
@@ -1312,7 +1314,7 @@ fn escape(colony: &mut Colony, output: &mut DList<Step>) {
     } else {
       next_pos = safe_moves[0];
       let mut max_estimate = escape_estimate(colony.width, colony.height, &colony.world, &colony.dangerous_place, safe_moves[0], &mut colony.tags, &mut colony.tagged);
-      for i in range(1u, safe_moves.len()) {
+      for i in 1 .. safe_moves.len() {
         let cur_estimate = escape_estimate(colony.width, colony.height, &colony.world, &colony.dangerous_place, safe_moves[i], &mut colony.tags, &mut colony.tagged);
         if cur_estimate > max_estimate || cur_estimate == max_estimate && colony.rng.gen() {
           max_estimate = cur_estimate;
@@ -1324,13 +1326,13 @@ fn escape(colony: &mut Colony, output: &mut DList<Step>) {
       move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos, &mut colony.log);
       colony.log.push_back(LogMessage::Goal(ant_pos, next_pos));
     } else {
-      *colony.moved.get_mut(ant_pos).unwrap() = true;
+      colony.moved[ant_pos] = true;
       colony.log.push_back(LogMessage::Goal(ant_pos, ant_pos));
     }
   }
 }
 
-fn approach_enemies(colony: &mut Colony, output: &mut DList<Step>) {
+fn approach_enemies(colony: &mut Colony, output: &mut LinkedList<Step>) {
   colony.log.push_back(LogMessage::ApproachEnemies);
   let width = colony.width;
   let height = colony.height;
@@ -1344,15 +1346,15 @@ fn approach_enemies(colony: &mut Colony, output: &mut DList<Step>) {
     if path_size > approach_path_size {
       return false;
     }
-    let cell = world[pos].clone();
-    if !is_free(cell.clone()) {
-      if is_players_ant(cell.clone(), 0) && !moved[pos] {
+    let cell = world[pos];
+    if !is_free(cell) {
+      if is_players_ant(cell, 0) && !moved[pos] {
         log.push_back(LogMessage::Goal(pos, start_pos));
         if dangerous_place[prev] == 0 {
           move_one(width, height, world, moved, output, pos, prev, log);
           true
         } else {
-          *moved.get_mut(pos).unwrap() = true;
+          moved[pos] = true;
           false
         }
       } else {
@@ -1393,14 +1395,14 @@ fn calculate_aggressive_place(colony: &mut Colony) {
     if colony.world[se(colony.width, colony.height, pos)] == Cell::Ant(0) {
       neighbors += 1;
     }
-    *aggressive_place.get_mut(pos).unwrap() = NEIGHBORS_AGGRESSION[neighbors];
+    aggressive_place[pos] = NEIGHBORS_AGGRESSION[neighbors];
   }
   if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
     return;
   }
   wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_anthills.iter(), |pos, _, path_size, _| {
     if path_size <= OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE {
-      *aggressive_place.get_mut(pos).unwrap() = max(aggressive_place[pos], OURS_ANTHILLS_AGGRESSION);
+      aggressive_place[pos] = cmp::max(aggressive_place[pos], OURS_ANTHILLS_AGGRESSION);
       true
     } else {
       false
@@ -1419,17 +1421,17 @@ fn calculate_dangerous_place(colony: &mut Colony) { //TODO: standing_ants.
     let s_pos = s(colony.width, colony.height, ant_pos);
     let w_pos = w(colony.width, ant_pos);
     let e_pos = e(colony.width, ant_pos);
-    let n_pos_water_or_food = is_water_or_food(colony.world[n_pos].clone());
-    let s_pos_water_or_food = is_water_or_food(colony.world[s_pos].clone());
-    let w_pos_water_or_food = is_water_or_food(colony.world[w_pos].clone());
-    let e_pos_water_or_food = is_water_or_food(colony.world[e_pos].clone());
+    let n_pos_water_or_food = is_water_or_food(colony.world[n_pos]);
+    let s_pos_water_or_food = is_water_or_food(colony.world[s_pos]);
+    let w_pos_water_or_food = is_water_or_food(colony.world[w_pos]);
+    let e_pos_water_or_food = is_water_or_food(colony.world[e_pos]);
     simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, _| {
       if euclidean(width, height, ant_pos, pos) <= attack_radius2 ||
          euclidean(width, height, n_pos, pos) <= attack_radius2 && !n_pos_water_or_food ||
          euclidean(width, height, s_pos, pos) <= attack_radius2 && !s_pos_water_or_food ||
          euclidean(width, height, w_pos, pos) <= attack_radius2 && !w_pos_water_or_food ||
          euclidean(width, height, e_pos, pos) <= attack_radius2 && !e_pos_water_or_food {
-        *dangerous_place.get_mut(pos).unwrap() += 1;
+        dangerous_place[pos] += 1;
         true
       } else {
         false
@@ -1439,7 +1441,7 @@ fn calculate_dangerous_place(colony: &mut Colony) { //TODO: standing_ants.
   }
 }
 
-fn defend_anhills(colony: &mut Colony, output: &mut DList<Step>) {
+fn defend_anhills(colony: &mut Colony, output: &mut LinkedList<Step>) {
   colony.log.push_back(LogMessage::DefendAnthills);
   if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
     return;
@@ -1447,14 +1449,14 @@ fn defend_anhills(colony: &mut Colony, output: &mut DList<Step>) {
   let world = &mut colony.world;
   let dangerous_place = &colony.dangerous_place;
   let tmp = &mut colony.tmp;
-  let mut defended_anhills = 0u;
+  let mut defended_anhills = 0;
   let mut path = Vec::new();
-  let mut defenders = DList::new();
+  let mut defenders = LinkedList::new();
   for &anthill_pos in colony.ours_anthills.iter() {
     let mut defended = false;
-    let mut enemies_ants = DList::new();
+    let mut enemies_ants = LinkedList::new();
     simple_wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, anthill_pos, |pos, path_size, _| {
-      let cell = world[pos].clone();
+      let cell = world[pos];
       if path_size > DEFEND_ANTHILLS_PATH_SIZE || cell == Cell::Water {
         false
       } else {
@@ -1468,27 +1470,27 @@ fn defend_anhills(colony: &mut Colony, output: &mut DList<Step>) {
       find_inverse_path(&colony.tags, anthill_pos, ant_pos, &mut path);
       let mut maybe_defender = None;
       for &pos in path.iter() {
-        if is_players_ant(world[pos].clone(), 0) && tmp[pos] == 0 {
+        if is_players_ant(world[pos], 0) && tmp[pos] == 0 {
           maybe_defender = Some(pos);
           break;
         }
         let n_pos = n(colony.width, colony.height, pos);
-        if is_players_ant(world[n_pos].clone(), 0) && tmp[n_pos] == 0 {
+        if is_players_ant(world[n_pos], 0) && tmp[n_pos] == 0 {
           maybe_defender = Some(n_pos);
           break;
         }
         let w_pos = w(colony.width, pos);
-        if is_players_ant(world[w_pos].clone(), 0) && tmp[w_pos] == 0 {
+        if is_players_ant(world[w_pos], 0) && tmp[w_pos] == 0 {
           maybe_defender = Some(w_pos);
           break;
         }
         let s_pos = s(colony.width, colony.height, pos);
-        if is_players_ant(world[s_pos].clone(), 0) && tmp[s_pos] == 0 {
+        if is_players_ant(world[s_pos], 0) && tmp[s_pos] == 0 {
           maybe_defender = Some(s_pos);
           break;
         }
         let e_pos = e(colony.width, pos);
-        if is_players_ant(world[e_pos].clone(), 0) && tmp[e_pos] == 0 {
+        if is_players_ant(world[e_pos], 0) && tmp[e_pos] == 0 {
           maybe_defender = Some(e_pos);
           break;
         }
@@ -1497,7 +1499,7 @@ fn defend_anhills(colony: &mut Colony, output: &mut DList<Step>) {
         let three_fourth_pos = path[path.len() * 3 / 4];
         maybe_defender = simple_wave(colony.width, colony.height, &mut colony.tags2, &mut colony.tagged2, three_fourth_pos, |pos, path_size, _| {
           path_size <= DEFENDER_PATH_SIZE && world[pos] != Cell::Water
-        }, |pos, _, _| { is_players_ant(world[pos].clone(), 0) && tmp[pos] == 0 });
+        }, |pos, _, _| { is_players_ant(world[pos], 0) && tmp[pos] == 0 });
         clear_tags(&mut colony.tags2, &mut colony.tagged2);
       }
       if maybe_defender.is_none() {
@@ -1507,33 +1509,33 @@ fn defend_anhills(colony: &mut Colony, output: &mut DList<Step>) {
       let defender = maybe_defender.unwrap();
       colony.log.push_back(LogMessage::Defender(anthill_pos, ant_pos, defender));
       defenders.push_back(defender);
-      *tmp.get_mut(defender).unwrap() = 1;
+      tmp[defender] = 1;
       if colony.moved[defender] {
         continue;
       }
       let center_pos = path[path.len() / 2];
       if defender == center_pos {
-        *colony.moved.get_mut(defender).unwrap() = true;
+        colony.moved[defender] = true;
         colony.log.push_back(LogMessage::Goal(defender, defender));
         continue;
       }
       if simple_wave(colony.width, colony.height, &mut colony.tags2, &mut colony.tagged2, defender, |pos, _, prev| { //TODO: A*.
-        let cell = world[pos].clone();
+        let cell = world[pos];
         pos == defender || cell != Cell::Water && (prev != defender || is_free(cell) && dangerous_place[pos] == 0)
       }, |pos, _, _| { pos == center_pos }).is_none() {
         clear_tags(&mut colony.tags2, &mut colony.tagged2);
-        *colony.moved.get_mut(defender).unwrap() = true;
+        colony.moved[defender] = true;
         colony.log.push_back(LogMessage::Goal(defender, defender));
         continue;
       }
-      let mut defender_path = DList::new();
+      let mut defender_path = LinkedList::new();
       find_path(&colony.tags2, defender, center_pos, &mut defender_path);
       clear_tags(&mut colony.tags2, &mut colony.tagged2);
       let next_pos = *defender_path.front().unwrap();
       move_one(colony.width, colony.height, world, &mut colony.moved, output, defender, next_pos, &mut colony.log);
       colony.log.push_back(LogMessage::Goal(defender, center_pos));
       defenders.push_back(next_pos);
-      *tmp.get_mut(next_pos).unwrap() = 1;
+      tmp[next_pos] = 1;
     }
     clear_tags(&mut colony.tags, &mut colony.tagged);
     if defended {
@@ -1544,33 +1546,33 @@ fn defend_anhills(colony: &mut Colony, output: &mut DList<Step>) {
     }
   }
   for &defender in defenders.iter() {
-    *tmp.get_mut(defender).unwrap() = 0;
+    tmp[defender] = 0;
   }
 }
 
-fn get_random_move(width: uint, height: uint, world: &Vec<Cell>, dangerous_place: &Vec<uint>, rng: &mut XorShiftRng, pos: uint) -> uint {
+fn get_random_move(width: usize, height: usize, world: &Vec<Cell>, dangerous_place: &Vec<usize>, rng: &mut XorShiftRng, pos: usize) -> usize {
   let mut moves = Vec::new();
   moves.push(pos);
   let n_pos = n(width, height, pos);
-  if is_free(world[n_pos].clone()) && dangerous_place[n_pos] == 0 {
+  if is_free(world[n_pos]) && dangerous_place[n_pos] == 0 {
     moves.push(n_pos);
   }
   let w_pos = w(width, pos);
-  if is_free(world[w_pos].clone()) && dangerous_place[w_pos] == 0 {
+  if is_free(world[w_pos]) && dangerous_place[w_pos] == 0 {
     moves.push(w_pos);
   }
   let s_pos = s(width, height, pos);
-  if is_free(world[s_pos].clone()) && dangerous_place[s_pos] == 0 {
+  if is_free(world[s_pos]) && dangerous_place[s_pos] == 0 {
     moves.push(s_pos);
   }
   let e_pos = e(width, pos);
-  if is_free(world[e_pos].clone()) && dangerous_place[e_pos] == 0 {
+  if is_free(world[e_pos]) && dangerous_place[e_pos] == 0 {
     moves.push(e_pos);
   }
   moves[rng.gen_range(0, moves.len())]
 }
 
-fn move_random(colony: &mut Colony, output: &mut DList<Step>) {
+fn move_random(colony: &mut Colony, output: &mut LinkedList<Step>) {
   colony.log.push_back(LogMessage::MoveRandom);
   for &ant_pos in colony.ours_ants.iter() {
     if colony.moved[ant_pos] {
@@ -1581,7 +1583,7 @@ fn move_random(colony: &mut Colony, output: &mut DList<Step>) {
       move_one(colony.width, colony.height, &mut colony.world, &mut colony.moved, output, ant_pos, next_pos, &mut colony.log);
       colony.log.push_back(LogMessage::Goal(ant_pos, next_pos));
     } else {
-      *colony.moved.get_mut(ant_pos).unwrap() = true;
+      colony.moved[ant_pos] = true;
       colony.log.push_back(LogMessage::Goal(ant_pos, ant_pos));
     }
   }
@@ -1605,18 +1607,18 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
   let last_world = &mut colony.last_world;
   let world = &mut colony.world;
   let len = length(width, height);
-  for pos in range(0u, len) {
-    *last_world.get_mut(pos).unwrap() = world[pos].clone();
-    *world.get_mut(pos).unwrap() = Cell::Unknown;
-    *colony.moved.get_mut(pos).unwrap() = false;
-    *colony.gathered_food.get_mut(pos).unwrap() = 0;
-    *visible_area.get_mut(pos).unwrap() += 1;
-    *discovered_area.get_mut(pos).unwrap() += 1;
-    *colony.territory.get_mut(pos).unwrap() = 0;
-    *colony.groups.get_mut(pos).unwrap() = 0;
-    *colony.dangerous_place.get_mut(pos).unwrap() = 0;
-    *colony.aggressive_place.get_mut(pos).unwrap() = 0;
-    *colony.fighting.get_mut(pos).unwrap() = false;
+  for pos in 0 .. len {
+    last_world[pos] = world[pos];
+    world[pos] = Cell::Unknown;
+    colony.moved[pos] = false;
+    colony.gathered_food[pos] = 0;
+    visible_area[pos] += 1;
+    discovered_area[pos] += 1;
+    colony.territory[pos] = 0;
+    colony.groups[pos] = 0;
+    colony.dangerous_place[pos] = 0;
+    colony.aggressive_place[pos] = 0;
+    colony.fighting[pos] = false;
   }
   colony.ours_ants.clear();
   colony.enemies_ants.clear();
@@ -1625,19 +1627,19 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
   colony.food.clear();
   colony.alone_ants.clear();
   for i in input {
-    match i.clone() {
-      Input::InputWater(point) => {
+    match i {
+      &Input::Water(point) => {
         let pos = to_pos(width, point);
-        *world.get_mut(pos).unwrap() = Cell::Water;
+        world[pos] = Cell::Water;
       },
-      Input::InputFood(point) => {
+      &Input::Food(point) => {
         let pos = to_pos(width, point);
-        *world.get_mut(pos).unwrap() = Cell::Food;
+        world[pos] = Cell::Food;
         colony.food.push(pos);
       },
-      Input::InputAnthill(point, player) => {
+      &Input::Anthill(point, player) => {
         let pos = to_pos(width, point);
-        *world.get_mut(pos).unwrap() = if world[pos] == Cell::Ant(player) { Cell::AnthillWithAnt(player) } else { Cell::Anthill(player) };
+        world[pos] = if world[pos] == Cell::Ant(player) { Cell::AnthillWithAnt(player) } else { Cell::Anthill(player) };
         if player == 0 {
           colony.ours_anthills.push(pos);
         } else {
@@ -1647,9 +1649,9 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
           }
         }
       },
-      Input::InputAnt(point, player) => {
+      &Input::Ant(point, player) => {
         let pos = to_pos(width, point);
-        *world.get_mut(pos).unwrap() = if world[pos] == Cell::Anthill(player) { Cell::AnthillWithAnt(player) } else { Cell::Ant(player) };
+        world[pos] = if world[pos] == Cell::Anthill(player) { Cell::AnthillWithAnt(player) } else { Cell::Ant(player) };
         if player == 0 {
           colony.ours_ants.push(pos);
         } else {
@@ -1659,16 +1661,16 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
           }
         }
       },
-      Input::InputDead(_, _) => { }
+      &Input::Dead(_, _) => { }
     }
   }
   for &ant_pos in colony.ours_ants.iter() {
     simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, _| {
       if euclidean(width, height, pos, ant_pos) <= view_radius2 {
         if manhattan(width, height, pos, ant_pos) <= min_view_radius_manhattan {
-          *discovered_area.get_mut(pos).unwrap() = 0;
+          discovered_area[pos] = 0;
         }
-        *visible_area.get_mut(pos).unwrap() = 0;
+        visible_area[pos] = 0;
         true
       } else {
         false
@@ -1676,23 +1678,23 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
     }, |_, _, _| { false });
     clear_tags(&mut colony.tags, &mut colony.tagged);
   }
-  for pos in range(0u, len) {
+  for pos in 0 .. len {
     if visible_area[pos] == 0 {
       if world[pos] == Cell::Unknown {
-        *world.get_mut(pos).unwrap() = match last_world[pos] {
+        world[pos] = match last_world[pos] {
           Cell::Water => Cell::Water,
           _ => Cell::Land
         }
       }
-      if is_enemy_ant(world[pos].clone()) {
-        *colony.standing_ants.get_mut(pos).unwrap() += 1;
+      if is_enemy_ant(world[pos]) {
+        colony.standing_ants[pos] += 1;
       } else {
-        *colony.standing_ants.get_mut(pos).unwrap() = 0;
+        colony.standing_ants[pos] = 0;
       }
     } else {
-      *world.get_mut(pos).unwrap() = match last_world[pos] {
+      world[pos] = match last_world[pos] {
          Cell::Water => {
-          *visible_area.get_mut(pos).unwrap() = 0;
+          visible_area[pos] = 0;
           Cell::Water
         },
         Cell::Food => {
@@ -1720,20 +1722,20 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
           Cell::AnthillWithAnt(player)
         }
       };
-      *colony.standing_ants.get_mut(pos).unwrap() = 0;
+      colony.standing_ants[pos] = 0;
     }
   }
-  for ant_pos in range(0u, len) {
+  for ant_pos in 0 .. len {
     if colony.standing_ants[ant_pos] > STANDING_ANTS_CONST {
       if !simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |_, _, prev| { euclidean(width, height, prev, ant_pos) <= attack_radius2 }, |pos, _, _| { last_world[pos] != Cell::Unknown && last_world[pos] != world[pos] }).is_none() {
-        *colony.standing_ants.get_mut(ant_pos).unwrap() = STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST;
+        colony.standing_ants[ant_pos] = STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST;
       }
       clear_tags(&mut colony.tags, &mut colony.tagged);
     }
   }
 }
 
-fn is_timeout(start_time: u64, turn_time: uint, log: &mut DList<LogMessage>) -> bool {
+fn is_timeout(start_time: u64, turn_time: u32, log: &mut LinkedList<LogMessage>) -> bool {
   if elapsed_time(start_time) + CRITICAL_TIME > turn_time {
     log.push_back(LogMessage::Timeout);
     true
@@ -1742,7 +1744,7 @@ fn is_timeout(start_time: u64, turn_time: uint, log: &mut DList<LogMessage>) -> 
   }
 }
 
-pub fn turn<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mut T, output: &mut DList<Step>) {
+pub fn turn<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mut T, output: &mut LinkedList<Step>) {
   colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
