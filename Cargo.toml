@@ -5,8 +5,8 @@ authors = ["Kurnevsky Evgeny <kurnevsky@gmail.com>"]
 license = "GPL-3.0"
 
 [dependencies]
-rand = "0.3.9"
-time = "0.1.32"
+rand = "*"
+time = "*"
 
 [profile.dev]
 opt-level = 0
