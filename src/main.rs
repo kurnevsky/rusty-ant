@@ -284,7 +284,7 @@ fn main() {
         }
         match turn_info(&mut stdin) {
           Some(input) => {
-            turn(&mut *colony, &mut input.iter(), &mut output);
+            turn(&mut *colony, &input, &mut output);
             print_output(&mut stdout, &mut output)
           },
           None => {

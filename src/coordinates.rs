@@ -1,5 +1,7 @@
 use std::cmp;
 
+type Pos = usize;
+
 #[derive(Clone, Copy)]
 pub struct Point {
   pub y: usize,

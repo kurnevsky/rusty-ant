@@ -1596,7 +1596,7 @@ fn shuffle(colony: &mut Colony) {
   colony.enemies_anthills.sort();
 }
 
-fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mut T) {
+fn update_world(colony: &mut Colony, input: &[Input]) {
   let view_radius2 = colony.view_radius2;
   let attack_radius2 = colony.attack_radius2;
   let min_view_radius_manhattan = colony.min_view_radius_manhattan;
@@ -1627,17 +1627,17 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
   colony.food.clear();
   colony.alone_ants.clear();
   for i in input {
-    match i {
-      &Input::Water(point) => {
+    match *i {
+      Input::Water(point) => {
         let pos = to_pos(width, point);
         world[pos] = Cell::Water;
       },
-      &Input::Food(point) => {
+      Input::Food(point) => {
         let pos = to_pos(width, point);
         world[pos] = Cell::Food;
         colony.food.push(pos);
       },
-      &Input::Anthill(point, player) => {
+      Input::Anthill(point, player) => {
         let pos = to_pos(width, point);
         world[pos] = if world[pos] == Cell::Ant(player) { Cell::AnthillWithAnt(player) } else { Cell::Anthill(player) };
         if player == 0 {
@@ -1649,7 +1649,7 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
           }
         }
       },
-      &Input::Ant(point, player) => {
+      Input::Ant(point, player) => {
         let pos = to_pos(width, point);
         world[pos] = if world[pos] == Cell::Anthill(player) { Cell::AnthillWithAnt(player) } else { Cell::Ant(player) };
         if player == 0 {
@@ -1661,7 +1661,7 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
           }
         }
       },
-      &Input::Dead(_, _) => { }
+      Input::Dead(_, _) => { }
     }
   }
   for &ant_pos in colony.ours_ants.iter() {
@@ -1701,9 +1701,8 @@ fn update_world<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mu
           colony.food.push(pos);
           Cell::Food
         },
-        Cell::Land => Cell::Land,
         Cell::Unknown => Cell::Unknown,
-        Cell::Ant(0) | Cell::AnthillWithAnt(0) => Cell::Land,
+        Cell::Land | Cell::Ant(0) | Cell::AnthillWithAnt(0) => Cell::Land,
         Cell::Anthill(0) => {
           colony.ours_anthills.push(pos);
           Cell::Anthill(0)
@@ -1744,7 +1743,7 @@ fn is_timeout(start_time: u64, turn_time: u32, log: &mut Vec<LogMessage>) -> boo
   }
 }
 
-pub fn turn<'r, T: Iterator<Item=&'r Input>>(colony: &mut Colony, input: &mut T, output: &mut Vec<Step>) {
+pub fn turn(colony: &mut Colony, input: &[Input], output: &mut Vec<Step>) {
   colony.start_time = get_time();
   output.clear();
   colony.cur_turn += 1;
