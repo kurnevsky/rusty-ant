@@ -7,6 +7,10 @@ license = "GPL-3.0"
 [dependencies]
 rand = "*"
 time = "*"
+clippy = { version = "*", optional = true }
+
+[features]
+default = ["clippy"]
 
 [profile.dev]
 opt-level = 0
