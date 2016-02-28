@@ -6,7 +6,6 @@
 
 extern crate rand;
 
-use std::collections::LinkedList;
 use std::str::FromStr;
 use std::io;
 use std::io::{BufRead, BufReader, Write};
@@ -175,8 +174,8 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
   }
 }
 
-fn turn_info<T: BufRead>(reader: &mut T) -> Option<Box<LinkedList<Input>>> {
-  let mut input = Box::new(LinkedList::new());
+fn turn_info<T: BufRead>(reader: &mut T) -> Option<Vec<Input>> {
+  let mut input = Vec::new();
   loop {
     let string = read_nonempty_line(reader);
     let split: Vec<&str> = string.as_str().trim().split(' ').collect();
@@ -195,7 +194,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Box<LinkedList<Input>>> {
           return None;
         }
         if let (Some(row), Some(col)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok()) {
-          input.push_back(Input::Water(Point { x: col, y: row }));
+          input.push(Input::Water(Point { x: col, y: row }));
         } else {
           return None;
         }
@@ -205,7 +204,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Box<LinkedList<Input>>> {
           return None;
         }
         if let (Some(row), Some(col)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok()) {
-          input.push_back(Input::Food(Point { x: col, y: row }));
+          input.push(Input::Food(Point { x: col, y: row }));
         } else {
           return None;
         }
@@ -215,7 +214,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Box<LinkedList<Input>>> {
           return None;
         }
         if let (Some(row), Some(col), Some(player)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok(), usize::from_str(split[3]).ok()) {
-          input.push_back(Input::Anthill(Point { x: col, y: row }, player));
+          input.push(Input::Anthill(Point { x: col, y: row }, player));
         } else {
           return None;
         }
@@ -225,7 +224,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Box<LinkedList<Input>>> {
           return None;
         }
         if let (Some(row), Some(col), Some(player)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok(), usize::from_str(split[3]).ok()) {
-          input.push_back(Input::Ant(Point { x: col, y: row }, player));
+          input.push(Input::Ant(Point { x: col, y: row }, player));
         } else {
           return None;
         }
@@ -235,7 +234,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Box<LinkedList<Input>>> {
           return None;
         }
         if let (Some(row), Some(col), Some(player)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok(), usize::from_str(split[3]).ok()) {
-          input.push_back(Input::Dead(Point { x: col, y: row }, player));
+          input.push(Input::Dead(Point { x: col, y: row }, player));
         } else {
           return None;
         }
@@ -247,7 +246,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Box<LinkedList<Input>>> {
   }
 }
 
-fn print_output<T: Write>(writer: &mut T, output: &mut LinkedList<Step>) {
+fn print_output<T: Write>(writer: &mut T, output: &mut Vec<Step>) {
   for i in output.iter() {
     writeln!(writer, "o {0} {1} {2}", i.point.y, i.point.x, match i.direction {
       Direction::North => 'N',
@@ -270,7 +269,7 @@ fn main() {
   let mut stdin = BufReader::new(io::stdin());
   let mut stderr = io::stderr();
   let mut stdout = io::stdout();
-  let mut output: LinkedList<Step> = LinkedList::new();
+  let mut output = Vec::new();
   if read_turn(&mut stdin) != Some(0) {
     writeln!(stderr, "Icorrect input 1!").ok();
     return;

@@ -1,4 +1,4 @@
-use std::collections::LinkedList;
+use std::collections::VecDeque;
 use coordinates::*;
 
 #[derive(Clone)]
@@ -15,7 +15,7 @@ impl Tag {
 }
 
 pub fn wave<'r, T: Iterator<Item=&'r usize>, F1: FnMut(usize, usize, usize, usize) -> bool, F2: FnMut(usize, usize, usize, usize) -> bool>(width: usize, height: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, start: &mut T, mut cond: F1, mut stop_cond: F2) -> Option<usize> {
-  let mut q = LinkedList::new();
+  let mut q = VecDeque::new();
   for &pos in start {
     if cond(pos, pos, 0, pos) {
       q.push_back(pos);
@@ -87,16 +87,17 @@ pub fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
   tagged.clear();
 }
 
-pub fn find_path(tags: &Vec<Tag>, from: usize, to: usize, path: &mut LinkedList<usize>) {
+pub fn find_path(tags: &Vec<Tag>, from: usize, to: usize, path: &mut Vec<usize>) { //TODO: merge with find_inverse_path; don't use Vec::reverse.
   path.clear();
   if tags[to].start != from {
     return;
   }
   let mut pos = to;
   while pos != from {
-    path.push_front(pos);
+    path.push(pos);
     pos = tags[pos].prev;
   }
+  path.reverse();
 }
 
 pub fn find_inverse_path(tags: &Vec<Tag>, from: usize, to: usize, path: &mut Vec<usize>) {

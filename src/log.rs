@@ -1,4 +1,3 @@
-use std::collections::LinkedList;
 use std::io::Write;
 use std::ops::Deref;
 use coordinates::*;
@@ -18,9 +17,9 @@ pub enum LogMessage {
   Group(usize),
   Aggression(usize),
   Estimate(isize),
-  OursAnts(Box<LinkedList<usize>>),
-  OtherOursAnts(Box<LinkedList<usize>>),
-  EnemiesAnts(Box<LinkedList<usize>>),
+  OursAnts(Vec<usize>),
+  OtherOursAnts(Vec<usize>),
+  EnemiesAnts(Vec<usize>),
   GroupSize(usize, usize),
   Goal(usize, usize),
   Defender(usize, usize, usize),
@@ -35,14 +34,14 @@ fn write_pos<T: Write>(width: usize, pos: usize, writer: &mut T) {
   write!(writer, "{0}:{1}", point.y, point.x).ok();
 }
 
-fn write_ants<T: Write>(width: usize, ants: &LinkedList<usize>, writer: &mut T) {
+fn write_ants<T: Write>(width: usize, ants: &Vec<usize>, writer: &mut T) {
   for &pos in ants {
     write_pos(width, pos, writer);
     write!(writer, " ").ok();
   }
 }
 
-pub fn write_log<T: Write>(width: usize, log: &LinkedList<LogMessage>, writer: &mut T) {
+pub fn write_log<T: Write>(width: usize, log: &Vec<LogMessage>, writer: &mut T) {
   for log_message in log {
     match log_message {
       &LogMessage::Turn(turn) => {
@@ -86,17 +85,17 @@ pub fn write_log<T: Write>(width: usize, log: &LinkedList<LogMessage>, writer: &
       },
       &LogMessage::OursAnts(ref ants) => {
         write!(writer, "    Ours ants: ").ok();
-        write_ants(width, ants.deref(), writer);
+        write_ants(width, ants, writer);
         writeln!(writer, "").ok();
       },
       &LogMessage::OtherOursAnts(ref ants) => {
         write!(writer, "    Other ours ants: ").ok();
-        write_ants(width, ants.deref(), writer);
+        write_ants(width, ants, writer);
         writeln!(writer, "").ok();
       },
       &LogMessage::EnemiesAnts(ref ants) => {
         write!(writer, "    Enemies ants: ").ok();
-        write_ants(width, ants.deref(), writer);
+        write_ants(width, ants, writer);
         writeln!(writer, "").ok();
       },
       &LogMessage::GroupSize(ours_moves_count, enemies_count) => {
