@@ -58,7 +58,7 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
   loop {
     let input = read_nonempty_line(reader);
     let split: Vec<&str> = input.as_str().trim().split(' ').collect();
-    if split.len() == 0 {
+    if split.is_empty() {
       return None;
     }
     match split[0] {
@@ -179,7 +179,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Vec<Input>> {
   loop {
     let string = read_nonempty_line(reader);
     let split: Vec<&str> = string.as_str().trim().split(' ').collect();
-    if split.len() == 0 {
+    if split.is_empty() {
       return None;
     }
     match split[0] {
