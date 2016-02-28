@@ -379,7 +379,7 @@ fn travel(colony: &mut Colony, output: &mut Vec<Step>) {
     clear_tags(&mut colony.tags, &mut colony.tagged);
     let mut path_pos = ant_pos;
     let mut moves = Vec::new();
-    for &pos in path.iter() {
+    for &pos in path.iter().rev() {
       moves.push((path_pos, pos));
       colony.log.push(LogMessage::Goal(path_pos, goal.unwrap()));
       if !is_players_ant(world[pos], 0) {
@@ -1467,7 +1467,7 @@ fn defend_anhills(colony: &mut Colony, output: &mut Vec<Step>) {
       }
     }, |_, _, _| { false });
     for &ant_pos in enemies_ants.iter() {
-      find_inverse_path(&colony.tags, anthill_pos, ant_pos, &mut path);
+      find_path(&colony.tags, anthill_pos, ant_pos, &mut path);
       let mut maybe_defender = None;
       for &pos in path.iter() {
         if is_players_ant(world[pos], 0) && tmp[pos] == 0 {
@@ -1531,7 +1531,7 @@ fn defend_anhills(colony: &mut Colony, output: &mut Vec<Step>) {
       let mut defender_path = Vec::new();
       find_path(&colony.tags2, defender, center_pos, &mut defender_path);
       clear_tags(&mut colony.tags2, &mut colony.tagged2);
-      let next_pos = *defender_path.first().unwrap();
+      let next_pos = *defender_path.last().unwrap();
       move_one(colony.width, colony.height, world, &mut colony.moved, output, defender, next_pos, &mut colony.log);
       colony.log.push(LogMessage::Goal(defender, center_pos));
       defenders.push(next_pos);

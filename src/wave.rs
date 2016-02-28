@@ -87,7 +87,8 @@ pub fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
   tagged.clear();
 }
 
-pub fn find_path(tags: &Vec<Tag>, from: usize, to: usize, path: &mut Vec<usize>) { //TODO: merge with find_inverse_path; don't use Vec::reverse.
+/// Find the inverse path to the goal. Path includes the goal and doesn't include start position.
+pub fn find_path(tags: &Vec<Tag>, from: usize, to: usize, path: &mut Vec<usize>) {
   path.clear();
   if tags[to].start != from {
     return;
@@ -96,18 +97,5 @@ pub fn find_path(tags: &Vec<Tag>, from: usize, to: usize, path: &mut Vec<usize>)
   while pos != from {
     path.push(pos);
     pos = tags[pos].prev;
-  }
-  path.reverse();
-}
-
-pub fn find_inverse_path(tags: &Vec<Tag>, from: usize, to: usize, path: &mut Vec<usize>) {
-  path.clear();
-  if tags[to].start != from {
-    return;
-  }
-  let mut pos = to;
-  while pos != from {
-    pos = tags[pos].prev;
-    path.push(pos);
   }
 }
