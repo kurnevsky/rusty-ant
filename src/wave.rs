@@ -12,6 +12,10 @@ impl Tag {
   pub fn new() -> Tag {
     Tag { start: 0, prev: 0, length: 0 }
   }
+
+  pub fn length(&self) -> usize {
+    self.length
+  }
 }
 
 pub fn wave<'r, T, F1, F2>(width: usize, height: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, start: &mut T, mut cond: F1, mut stop_cond: F2) -> Option<usize> where
@@ -92,11 +96,12 @@ pub fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
 }
 
 /// Find the inverse path to the goal. Path includes the goal and doesn't include start position.
-pub fn find_path(tags: &Vec<Tag>, from: usize, to: usize, path: &mut Vec<usize>) {
+pub fn find_path(tags: &[Tag], from: usize, to: usize, path: &mut Vec<usize>) {
   path.clear();
   if tags[to].start != from {
     return;
   }
+  path.reserve(tags[to].length - 1);
   let mut pos = to;
   while pos != from {
     path.push(pos);

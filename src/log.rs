@@ -34,7 +34,7 @@ fn write_pos<T: Write>(width: usize, pos: usize, writer: &mut T) {
   write!(writer, "{0}:{1}", point.y, point.x).ok();
 }
 
-fn write_ants<T: Write>(width: usize, ants: &Vec<usize>, writer: &mut T) {
+fn write_ants<T: Write>(width: usize, ants: &[usize], writer: &mut T) {
   for &pos in ants {
     write_pos(width, pos, writer);
     write!(writer, " ").ok();
@@ -43,72 +43,72 @@ fn write_ants<T: Write>(width: usize, ants: &Vec<usize>, writer: &mut T) {
 
 pub fn write_log<T: Write>(width: usize, log: &Vec<LogMessage>, writer: &mut T) {
   for log_message in log {
-    match log_message {
-      &LogMessage::Turn(turn) => {
+    match *log_message {
+      LogMessage::Turn(turn) => {
         writeln!(writer, "Turn number: {}", turn).ok();
       },
-      &LogMessage::Attack => {
+      LogMessage::Attack => {
         writeln!(writer, "  Attack.").ok();
       },
-      &LogMessage::AttackAnthills => {
+      LogMessage::AttackAnthills => {
         writeln!(writer, "  Attack anthills.").ok();
       },
-      &LogMessage::GatherFood => {
+      LogMessage::GatherFood => {
         writeln!(writer, "  Gather food.").ok();
       },
-      &LogMessage::Discover => {
+      LogMessage::Discover => {
         writeln!(writer, "  Discover.").ok();
       },
-      &LogMessage::Travel => {
+      LogMessage::Travel => {
         writeln!(writer, "  Travel.").ok();
       },
-      &LogMessage::MoveRandom => {
+      LogMessage::MoveRandom => {
         writeln!(writer, "  Move random.").ok();
       },
-      &LogMessage::Escape => {
+      LogMessage::Escape => {
         writeln!(writer, "  Escape.").ok();
       },
-      &LogMessage::ApproachEnemies => {
+      LogMessage::ApproachEnemies => {
         writeln!(writer, "  Approach enemies.").ok();
       },
-      &LogMessage::DefendAnthills => {
+      LogMessage::DefendAnthills => {
         writeln!(writer, "  Defend anthills.").ok();
       },
-      &LogMessage::Group(group_index) => {
+      LogMessage::Group(group_index) => {
         writeln!(writer, "    Group number: {}", group_index).ok();
       },
-      &LogMessage::Aggression(aggression) => {
+      LogMessage::Aggression(aggression) => {
         writeln!(writer, "    Aggression level: {}", aggression).ok();
       },
-      &LogMessage::Estimate(estimate) => {
+      LogMessage::Estimate(estimate) => {
         writeln!(writer, "    Estimation: {}", estimate).ok();
       },
-      &LogMessage::OursAnts(ref ants) => {
+      LogMessage::OursAnts(ref ants) => {
         write!(writer, "    Ours ants: ").ok();
         write_ants(width, ants, writer);
         writeln!(writer, "").ok();
       },
-      &LogMessage::OtherOursAnts(ref ants) => {
+      LogMessage::OtherOursAnts(ref ants) => {
         write!(writer, "    Other ours ants: ").ok();
         write_ants(width, ants, writer);
         writeln!(writer, "").ok();
       },
-      &LogMessage::EnemiesAnts(ref ants) => {
+      LogMessage::EnemiesAnts(ref ants) => {
         write!(writer, "    Enemies ants: ").ok();
         write_ants(width, ants, writer);
         writeln!(writer, "").ok();
       },
-      &LogMessage::GroupSize(ours_moves_count, enemies_count) => {
+      LogMessage::GroupSize(ours_moves_count, enemies_count) => {
         writeln!(writer, "    Group size: {0} our moves; {1} enemies.", ours_moves_count, enemies_count).ok();
       },
-      &LogMessage::Goal(ant_pos, goal_pos) => {
+      LogMessage::Goal(ant_pos, goal_pos) => {
         write!(writer, "    Ours ant ").ok();
         write_pos(width, ant_pos, writer);
         write!(writer, " has goal ").ok();
         write_pos(width, goal_pos, writer);
         writeln!(writer, ".").ok();
       },
-      &LogMessage::Defender(anthill_pos, enemy_pos, ant_pos) => {
+      LogMessage::Defender(anthill_pos, enemy_pos, ant_pos) => {
         write!(writer, "    Ours anthill ").ok();
         write_pos(width, anthill_pos, writer);
         write!(writer, " has defender ").ok();
@@ -117,20 +117,20 @@ pub fn write_log<T: Write>(width: usize, log: &Vec<LogMessage>, writer: &mut T) 
         write_pos(width, enemy_pos, writer);
         writeln!(writer, ".").ok();
       },
-      &LogMessage::Timeout => {
+      LogMessage::Timeout => {
         writeln!(writer, "  Timeout.").ok();
       },
-      &LogMessage::MinimaxTimeout => {
+      LogMessage::MinimaxTimeout => {
         writeln!(writer, "    Minimax timeout.").ok();
       },
-      &LogMessage::Multitask(ant_pos, next_pos) => {
+      LogMessage::Multitask(ant_pos, next_pos) => {
         write!(writer, "    Multitask from ").ok();
         write_pos(width, ant_pos, writer);
         write!(writer, " to ").ok();
         write_pos(width, next_pos, writer);
         writeln!(writer, ".").ok();
       },
-      &LogMessage::Jump(ant_pos, next_pos) => {
+      LogMessage::Jump(ant_pos, next_pos) => {
         write!(writer, "    Jump from ").ok();
         write_pos(width, ant_pos, writer);
         write!(writer, " to ").ok();
