@@ -1102,14 +1102,6 @@ fn is_alone(width: usize, height: usize, attack_radius2: usize, world: &Vec<Cell
   true
 }
 
-fn log_ants<'r, T: Iterator<Item=&'r usize>>(ants: &mut T) -> Vec<usize> {
-  let mut result = Vec::new();
-  for &ant in ants {
-    result.push(ant);
-  }
-  result
-}
-
 fn get_other_ours(width: usize, height: usize, world: &[Cell], groups: &[usize], tmp: &mut Vec<usize>, group_index: usize, attack_radius2: usize, enemies: &Vec<usize>, other_ours: &mut Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
   other_ours.clear();
   for &enemy_pos in enemies {
@@ -1203,10 +1195,10 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
       for &pos in &ours {
         remove_ant(&mut colony.world, pos);
       }
-      colony.log.push(LogMessage::OursAnts(log_ants(&mut ours.iter())));
-      colony.log.push(LogMessage::EnemiesAnts(log_ants(&mut enemies.iter())));
+      colony.log.push(LogMessage::OursAnts(ours.clone()));
+      colony.log.push(LogMessage::EnemiesAnts(enemies.clone()));
       get_other_ours(colony.width, colony.height, &colony.world, &colony.groups, &mut colony.tmp, group_index, colony.attack_radius2, &enemies, &mut other_ours, &mut colony.tags, &mut colony.tagged);
-      colony.log.push(LogMessage::OtherOursAnts(log_ants(&mut other_ours.iter())));
+      colony.log.push(LogMessage::OtherOursAnts(other_ours.clone()));
       for &pos in &other_ours {
         add_attack(colony.width, colony.height, colony.attack_radius2, pos, &mut colony.tmp, &mut colony.tags, &mut colony.tagged);
         colony.board[pos].ant = 1;
@@ -1221,9 +1213,8 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
         set_ant(&mut colony.world, pos, 0);
       }
       if alpha != isize::min_value() {
-        let mut moves = Vec::new();
-        for i in 0 .. ours.len() {
-          let pos = ours[i];
+        let mut moves = Vec::with_capacity(ours.len());
+        for (i, &pos) in ours.iter().enumerate() {
           let next_pos = best_moves[i];
           if pos == next_pos {
             colony.moved[pos] = true;
