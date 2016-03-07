@@ -1356,28 +1356,28 @@ fn calculate_aggressive_place(colony: &mut Colony) {
   let aggressive_place = &mut colony.aggressive_place;
   for &pos in &colony.ours_ants {
     let mut neighbors = 0;
-    if colony.world[n(colony.width, colony.height, pos)] == Cell::Ant(0) { //TODO: or anthill with ant.
+    if is_players_ant(colony.world[n(colony.width, colony.height, pos)], 0) {
       neighbors += 1;
     }
-    if colony.world[w(colony.width, pos)] == Cell::Ant(0) {
+    if is_players_ant(colony.world[w(colony.width, pos)], 0) {
       neighbors += 1;
     }
-    if colony.world[s(colony.width, colony.height, pos)] == Cell::Ant(0) {
+    if is_players_ant(colony.world[s(colony.width, colony.height, pos)], 0) {
       neighbors += 1;
     }
-    if colony.world[e(colony.width, pos)] == Cell::Ant(0) {
+    if is_players_ant(colony.world[e(colony.width, pos)], 0) {
       neighbors += 1;
     }
-    if colony.world[nw(colony.width, colony.height, pos)] == Cell::Ant(0) {
+    if is_players_ant(colony.world[nw(colony.width, colony.height, pos)], 0) {
       neighbors += 1;
     }
-    if colony.world[ne(colony.width, colony.height, pos)] == Cell::Ant(0) {
+    if is_players_ant(colony.world[ne(colony.width, colony.height, pos)], 0) {
       neighbors += 1;
     }
-    if colony.world[sw(colony.width, colony.height, pos)] == Cell::Ant(0) {
+    if is_players_ant(colony.world[sw(colony.width, colony.height, pos)], 0) {
       neighbors += 1;
     }
-    if colony.world[se(colony.width, colony.height, pos)] == Cell::Ant(0) {
+    if is_players_ant(colony.world[se(colony.width, colony.height, pos)], 0) {
       neighbors += 1;
     }
     aggressive_place[pos] = NEIGHBORS_AGGRESSION[neighbors];
