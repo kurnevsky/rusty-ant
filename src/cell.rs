@@ -36,16 +36,14 @@ pub fn is_players_ant(cell: Cell, player: usize) -> bool {
 
 pub fn is_enemy_ant(cell: Cell) -> bool {
   match cell {
-    Cell::Ant(player) if player > 0 => true,
-    Cell::AnthillWithAnt(player) if player > 0 => true,
+    Cell::Ant(player) | Cell::AnthillWithAnt(player) if player > 0 => true,
     _ => false
   }
 }
 
 pub fn is_enemy_anthill(cell: Cell) -> bool {
   match cell {
-    Cell::Anthill(player) if player > 0 => true,
-    Cell::AnthillWithAnt(player) if player > 0 => true,
+    Cell::Anthill(player) | Cell::AnthillWithAnt(player) if player > 0 => true,
     _ => false
   }
 }
@@ -56,8 +54,7 @@ pub fn is_our_anthill(cell: Cell) -> bool {
 
 pub fn ant_owner(cell: Cell) -> Option<usize> {
   match cell {
-    Cell::Ant(player) => Some(player),
-    Cell::AnthillWithAnt(player) => Some(player),
+    Cell::Ant(player) | Cell::AnthillWithAnt(player) => Some(player),
     _ => None
   }
 }

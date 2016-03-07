@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::ops::Deref;
 use coordinates::*;
 
 #[derive(Clone, PartialEq)]
