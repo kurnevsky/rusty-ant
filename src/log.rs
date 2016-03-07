@@ -40,7 +40,7 @@ fn write_ants<T: Write>(width: usize, ants: &[usize], writer: &mut T) {
   }
 }
 
-pub fn write_log<T: Write>(width: usize, log: &Vec<LogMessage>, writer: &mut T) {
+pub fn write_log<T: Write>(width: usize, log: &[LogMessage], writer: &mut T) {
   for log_message in log {
     match *log_message {
       LogMessage::Turn(turn) => {

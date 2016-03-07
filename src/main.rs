@@ -3,6 +3,7 @@
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
 #![allow(dead_code)]
+#![allow(cyclomatic_complexity)]
 
 extern crate rand;
 
