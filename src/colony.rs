@@ -67,6 +67,8 @@ const OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: usize = 6; // Максимальн
 
 const OURS_ANTHILLS_AGGRESSION: usize = 2; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
 
+const LOG_CAPACITY_CONST: usize = 100;
+
 #[derive(Clone)]
 struct BoardCell {
   ant: usize, // Номер игрока, чей муравей сделал ход в текущую клетку, плюс один.
@@ -160,7 +162,7 @@ impl Colony {
       enemies_anthills: Vec::with_capacity(len),
       ours_anthills: Vec::with_capacity(len),
       food: Vec::with_capacity(len),
-      log: Vec::new() //TODO: capacity
+      log: Vec::with_capacity(turns_count * LOG_CAPACITY_CONST)
     }
   }
   pub fn log(&self) -> &Vec<LogMessage> {
