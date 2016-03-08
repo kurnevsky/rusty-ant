@@ -67,6 +67,14 @@ const OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: usize = 6; // Максимальн
 
 const OURS_ANTHILLS_AGGRESSION: usize = 2; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
 
+const ENEMY_ANT_ESCAPE_CONST: isize = -7;
+
+const OURS_ANT_ESCAPE_CONST: isize = 7;
+
+const FOOD_ESCAPE_CONST: isize = 3;
+
+const SAFE_PLACE_ESCAPE_CONST: isize = 1;
+
 const LOG_CAPACITY_CONST: usize = 100;
 
 #[derive(Clone)]
@@ -1229,14 +1237,14 @@ fn escape_estimation(width: usize, height: usize, world: &[Cell], dangerous_plac
     if path_size > ESCAPE_PATH_SIZE || cell == Cell::Water {
       false
     } else {
-      estimation += (ESCAPE_PATH_SIZE + 1 - path_size) as isize * if is_enemy_ant(cell) { //TODO: Move to constants.
-        -7
+      estimation += (ESCAPE_PATH_SIZE + 1 - path_size) as isize * if is_enemy_ant(cell) {
+        ENEMY_ANT_ESCAPE_CONST
       } else if is_players_ant(cell, 0) {
-        7
+        OURS_ANT_ESCAPE_CONST
       } else if cell == Cell::Food {
-        3
+        FOOD_ESCAPE_CONST
       } else if dangerous_place[pos] == 0 {
-        1
+        SAFE_PLACE_ESCAPE_CONST
       } else {
         0
       };
