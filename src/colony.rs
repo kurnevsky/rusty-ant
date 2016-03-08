@@ -1,4 +1,4 @@
-//TODO: аггрессивность, если игра долго идет, а противник известен только один.
+//TODO: аггрессивность, если игра долго идет, а противник известен только один (с учетом контроллируемой территории).
 //TODO: динамический подбор констатнт минимакса путем определения производительности на этапе инициализации. Динамическое уменьшение этих констант при таймаутах.
 //TODO: захват муравейников вместо уничтожения.
 //TODO: три варианта атаки:
@@ -775,10 +775,7 @@ fn get_chain_begin(mut pos: usize, board: &[BoardCell]) -> usize {
 
 fn get_moves_count(width: usize, height: usize, pos: usize, world: &[Cell], dangerous_place: &[usize]) -> usize {
   let mut result = 1;
-  let mut escape = false;
-  if dangerous_place[pos] == 0 {
-    escape = true;
-  }
+  let mut escape = dangerous_place[pos] == 0;
   let n_pos = n(width, height, pos);
   let s_pos = s(width, height, pos);
   let w_pos = w(width, pos);
@@ -1398,26 +1395,27 @@ fn calculate_aggressive_place(colony: &mut Colony) {
   clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
-fn calculate_dangerous_place(colony: &mut Colony) { //TODO: standing_ants.
+fn calculate_dangerous_place(colony: &mut Colony) {
   let width = colony.width;
   let height = colony.height;
   let attack_radius2 = colony.attack_radius2;
   let dangerous_place = &mut colony.dangerous_place;
   for &ant_pos in &colony.enemies_ants {
+    let not_standing = colony.standing_ants[ant_pos] <= STANDING_ANTS_CONST;
     let n_pos = n(colony.width, colony.height, ant_pos);
     let s_pos = s(colony.width, colony.height, ant_pos);
     let w_pos = w(colony.width, ant_pos);
     let e_pos = e(colony.width, ant_pos);
-    let n_pos_water_or_food = is_water_or_food(colony.world[n_pos]);
-    let s_pos_water_or_food = is_water_or_food(colony.world[s_pos]);
-    let w_pos_water_or_food = is_water_or_food(colony.world[w_pos]);
-    let e_pos_water_or_food = is_water_or_food(colony.world[e_pos]);
+    let n_pos_not_water_nor_food = !is_water_or_food(colony.world[n_pos]);
+    let s_pos_not_water_nor_food = !is_water_or_food(colony.world[s_pos]);
+    let w_pos_not_water_nor_food = !is_water_or_food(colony.world[w_pos]);
+    let e_pos_not_water_nor_food = !is_water_or_food(colony.world[e_pos]);
     simple_wave(width, height, &mut colony.tags, &mut colony.tagged, ant_pos, |pos, _, _| {
-      if euclidean(width, height, ant_pos, pos) <= attack_radius2 ||
-         euclidean(width, height, n_pos, pos) <= attack_radius2 && !n_pos_water_or_food ||
-         euclidean(width, height, s_pos, pos) <= attack_radius2 && !s_pos_water_or_food ||
-         euclidean(width, height, w_pos, pos) <= attack_radius2 && !w_pos_water_or_food ||
-         euclidean(width, height, e_pos, pos) <= attack_radius2 && !e_pos_water_or_food {
+      if euclidean(width, height, ant_pos, pos) <= attack_radius2 || not_standing &&
+         (n_pos_not_water_nor_food && euclidean(width, height, n_pos, pos) <= attack_radius2 ||
+          s_pos_not_water_nor_food && euclidean(width, height, s_pos, pos) <= attack_radius2 ||
+          w_pos_not_water_nor_food && euclidean(width, height, w_pos, pos) <= attack_radius2 ||
+          e_pos_not_water_nor_food && euclidean(width, height, e_pos, pos) <= attack_radius2) {
         dangerous_place[pos] += 1;
         true
       } else {
