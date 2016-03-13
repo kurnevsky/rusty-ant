@@ -1155,7 +1155,6 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
   let mut best_moves = Vec::new();
   let mut group_index = 1;
   for &pos in &colony.ours_ants {
-    if is_minimax_timeout(colony.start_time, colony.turn_time, &mut colony.log) { return; }
     if colony.moved[pos] || colony.groups[pos] != 0 {
       continue;
     }
@@ -1170,6 +1169,9 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
       }
       if ours.len() == 1 && ENEMIES_DEAD_ESTIMATION[aggression] < OURS_DEAD_ESTIMATION[aggression] && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &enemies, &mut colony.tags, &mut colony.tagged) {
         colony.alone_ants.push(ours[0]);
+        continue;
+      }
+      if is_minimax_timeout(colony.start_time, colony.turn_time, &mut colony.log) {
         continue;
       }
       colony.log.push(LogMessage::Group(group_index));
