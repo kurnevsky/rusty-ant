@@ -19,117 +19,117 @@ use step::*;
 use input::*;
 use log::*;
 
-const TERRITORY_PATH_SIZE_CONST: usize = 5;
+const TERRITORY_PATH_SIZE_CONST: u32 = 5;
 
-const APPROACH_PATH_SIZE_CONST: usize = 6;
+const APPROACH_PATH_SIZE_CONST: u32 = 6;
 
-const ESCAPE_PATH_SIZE: usize = 8;
+const ESCAPE_PATH_SIZE: u32 = 8;
 
-const GATHERING_FOOD_PATH_SIZE: usize = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
+const GATHERING_FOOD_PATH_SIZE: u32 = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
 
-const ATTACK_ANTHILLS_PATH_SIZE: usize = 20; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
+const ATTACK_ANTHILLS_PATH_SIZE: u32 = 20; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
 
-const DEFEND_ANTHILLS_PATH_SIZE: usize = 15;
+const DEFEND_ANTHILLS_PATH_SIZE: u32 = 15;
 
-const DEFENDER_PATH_SIZE: usize = 20;
+const DEFENDER_PATH_SIZE: u32 = 20;
 
-const ATTACK_ANTHILLS_ANTS_COUNT: usize = 2; // Максимальное количество наших муравьев, атакующих вражеские муравеники.
+const ATTACK_ANTHILLS_ANTS_COUNT: u32 = 2; // Максимальное количество наших муравьев, атакующих вражеские муравеники.
 
-const DANGEROUS_ANTHILLS_COUNT: usize = 3; // Если муравейников больше этого количества, не защищаем их вообще.
+const DANGEROUS_ANTHILLS_COUNT: u32 = 3; // Если муравейников больше этого количества, не защищаем их вообще.
 
-const DEFEND_ANTHILLS_COUNT: usize = 2; // Максимальное количество атакуемых своих муравейников, которые мы будем защищать.
+const DEFEND_ANTHILLS_COUNT: u32 = 2; // Максимальное количество атакуемых своих муравейников, которые мы будем защищать.
 
 const MINIMAX_CRITICAL_TIME: u32 = 100; // Если на ход осталось времени меньше этого количества миллисекунд, останавливаем минимакс и продолжаем вычислять ходы другими методами.
 
 const CRITICAL_TIME: u32 = 50; // Если на ход осталось времени меньше этого количества миллисекунд, больше ничего не делаем, а только отдаем уже сделанные ходы.
 
-const ENEMIES_DEAD_ESTIMATION: &'static [usize] = &[3000, 4000, 6000, 9000, 12000, 18000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
+const ENEMIES_DEAD_ESTIMATION: &'static [u32] = &[3000, 4000, 6000, 9000, 12000, 18000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
 
-const OURS_DEAD_ESTIMATION: &'static [usize] = &[6000, 6000, 6000, 6000, 6000, 6000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
+const OURS_DEAD_ESTIMATION: &'static [u32] = &[6000, 6000, 6000, 6000, 6000, 6000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
 
-const OUR_FOOD_ESTIMATION: &'static [usize] = &[2000, 2000, 2000, 2000, 2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
+const OUR_FOOD_ESTIMATION: &'static [u32] = &[2000, 2000, 2000, 2000, 2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
 
-const ENEMY_FOOD_ESTIMATION: &'static [usize] = &[1000, 1500, 2000, 3000, 4000, 6000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
+const ENEMY_FOOD_ESTIMATION: &'static [u32] = &[1000, 1500, 2000, 3000, 4000, 6000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
 
-const DESTROYED_ENEMY_ANTHILL_ESTIMATION: &'static [usize] = &[50000, 50000, 50000, 50000, 50000, 50000];
+const DESTROYED_ENEMY_ANTHILL_ESTIMATION: &'static [u32] = &[50000, 50000, 50000, 50000, 50000, 50000];
 
-const DESTROYED_OUR_ANTHILL_ESTIMATION: &'static [usize] = &[50000, 50000, 50000, 50000, 50000, 50000];
+const DESTROYED_OUR_ANTHILL_ESTIMATION: &'static [u32] = &[50000, 50000, 50000, 50000, 50000, 50000];
 
-const DISTANCE_TO_ENEMIES_ESTIMATION: &'static [usize] = &[1, 1, 1, 1, 1, 1];
+const DISTANCE_TO_ENEMIES_ESTIMATION: &'static [u32] = &[1, 1, 1, 1, 1, 1];
 
-const STANDING_ANTS_CONST: usize = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
+const STANDING_ANTS_CONST: u32 = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
 
-const STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST: usize = 4;
+const STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST: u32 = 4;
 
-const NEIGHBORS_AGGRESSION: &'static [usize] = &[0, 0, 1, 1, 1, 2, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
+const NEIGHBORS_AGGRESSION: &'static [u32] = &[0, 0, 1, 1, 1, 2, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
 
-const OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: usize = 6; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
+const OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: u32 = 6; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
 
-const OURS_ANTHILLS_AGGRESSION: usize = 2; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
+const OURS_ANTHILLS_AGGRESSION: u32 = 2; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
 
-const ENEMY_ANT_ESCAPE_CONST: isize = -7;
+const ENEMY_ANT_ESCAPE_CONST: i32 = -7;
 
-const OURS_ANT_ESCAPE_CONST: isize = 7;
+const OURS_ANT_ESCAPE_CONST: i32 = 7;
 
-const FOOD_ESCAPE_CONST: isize = 3;
+const FOOD_ESCAPE_CONST: i32 = 3;
 
-const SAFE_PLACE_ESCAPE_CONST: isize = 1;
+const SAFE_PLACE_ESCAPE_CONST: i32 = 1;
 
-const LOG_CAPACITY_CONST: usize = 100;
+const LOG_CAPACITY_CONST: u32 = 100;
 
 #[derive(Clone)]
 struct BoardCell {
-  ant: usize, // Номер игрока, чей муравей сделал ход в текущую клетку, плюс один.
-  attack: usize, // Количество врагов, атакующих муравья.
-  cycle: usize, // Клитка, из которой сделал ход муравей в текущую. Нужно для отсечения циклов (хождений муравьев по кругу).
+  ant: u32, // Номер игрока, чей муравей сделал ход в текущую клетку, плюс один.
+  attack: u32, // Количество врагов, атакующих муравья.
+  cycle: Pos, // Клитка, из которой сделал ход муравей в текущую. Нужно для отсечения циклов (хождений муравьев по кругу).
   dead: bool // Помечаются флагом погибшие в битве свои и чужие муравьи.
 }
 
 #[derive(Clone)]
 pub struct Colony {
-  width: usize, // Ширина поля.
-  height: usize, // Высота поля.
+  width: u32, // Ширина поля.
+  height: u32, // Высота поля.
   turn_time: u32, // Время на один ход.
-  turns_count: usize, // Количество ходов в игре.
-  view_radius2: usize,
-  attack_radius2: usize,
-  spawn_radius2: usize,
-  cur_turn: usize, // Номер текущего хода.
+  turns_count: u32, // Количество ходов в игре.
+  view_radius2: u32,
+  attack_radius2: u32,
+  spawn_radius2: u32,
+  cur_turn: u32, // Номер текущего хода.
   start_time: u64, // Время начала хода.
   rng: XorShiftRng, // Генератор случайных чисел.
-  min_view_radius_manhattan: usize,
-  max_view_radius_manhattan: usize,
-  max_attack_radius_manhattan: usize,
-  enemies_count: usize, // Известное количество врагов.
+  min_view_radius_manhattan: u32,
+  max_view_radius_manhattan: u32,
+  max_attack_radius_manhattan: u32,
+  enemies_count: u32, // Известное количество врагов.
   world: Vec<Cell>, // Текущее состояние мира. При ходе нашего муравья он передвигается на новую клетку.
   last_world: Vec<Cell>, // Предыдущее состояние мира со сделавшими ход нашими муравьями.
-  visible_area: Vec<usize>, // Равняется 0 для видимых клеток и известной воды, для остальных увеличивается на 1 перед каждым ходом.
-  discovered_area: Vec<usize>,
-  standing_ants: Vec<usize>, // Каждый ход увеличивается на 1 для вражеских муравьев (при условии, что у них не изменилось окружение) и сбрасывается в 0 для всех остальных клеток. То есть показывает, сколько ходов на месте стоит вражеский муравей.
+  visible_area: Vec<u32>, // Равняется 0 для видимых клеток и известной воды, для остальных увеличивается на 1 перед каждым ходом.
+  discovered_area: Vec<u32>,
+  standing_ants: Vec<u32>, // Каждый ход увеличивается на 1 для вражеских муравьев (при условии, что у них не изменилось окружение) и сбрасывается в 0 для всех остальных клеток. То есть показывает, сколько ходов на месте стоит вражеский муравей.
   moved: Vec<bool>, // Помечаются флагом клетки, откуда сделал ход наш муравей, а также куда он сделал ход.
-  gathered_food: Vec<usize>, // Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1.
-  territory: Vec<usize>,
-  dangerous_place: Vec<usize>, // Количество вражеских муравьев, которые могут атаковать клетку на следующем ходу.
-  aggressive_place: Vec<usize>,
-  groups: Vec<usize>,
+  gathered_food: Vec<Pos>, // Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1.
+  territory: Vec<u32>,
+  dangerous_place: Vec<u32>, // Количество вражеских муравьев, которые могут атаковать клетку на следующем ходу.
+  aggressive_place: Vec<u32>,
+  groups: Vec<u32>,
   fighting: Vec<bool>,
   board: Vec<BoardCell>,
-  tmp: Vec<usize>,
-  alone_ants: Vec<usize>,
+  tmp: Vec<u32>,
+  alone_ants: Vec<Pos>,
   tags: Vec<Tag>, // Тэги для волнового алгоритма.
-  tagged: Vec<usize>, // Список позиций start_tags и path_tags с ненулевыми значениями.
+  tagged: Vec<Pos>, // Список позиций start_tags и path_tags с ненулевыми значениями.
   tags2: Vec<Tag>, // Вторые тэги для волнового алгоритма.
-  tagged2: Vec<usize>, // Список позиций start_tags и path_tags во вторых тэгах с ненулевыми значениями.
-  ours_ants: Vec<usize>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
-  enemies_ants: Vec<usize>,
-  enemies_anthills: Vec<usize>,
-  ours_anthills: Vec<usize>, // Список клеток с нашими муравейниками (как в видимой области, так и за туманом войны).
-  food: Vec<usize>, // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
+  tagged2: Vec<Pos>, // Список позиций start_tags и path_tags во вторых тэгах с ненулевыми значениями.
+  ours_ants: Vec<Pos>, // Список наших муравьев. Если муравей сделал ход, позиция помечена в moved.
+  enemies_ants: Vec<Pos>,
+  enemies_anthills: Vec<Pos>,
+  ours_anthills: Vec<Pos>, // Список клеток с нашими муравейниками (как в видимой области, так и за туманом войны).
+  food: Vec<Pos>, // Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше).
   log: Vec<LogMessage>
 }
 
 impl Colony {
-  pub fn new(width: usize, height: usize, turn_time: u32, turns_count: usize, view_radius2: usize, attack_radius2: usize, spawn_radius2: usize, seed: u64) -> Colony {
+  pub fn new(width: u32, height: u32, turn_time: u32, turns_count: u32, view_radius2: u32, attack_radius2: u32, spawn_radius2: u32, seed: u64) -> Colony {
     let len = length(width, height);
     Colony {
       width: width,
@@ -142,9 +142,9 @@ impl Colony {
       cur_turn: 0,
       start_time: get_time(),
       rng: XorShiftRng::from_seed([1, ((seed >> 32) & 0xFFFFFFFF) as u32, 3, (seed & 0xFFFFFFFF) as u32]),
-      min_view_radius_manhattan: (view_radius2 as f32).sqrt() as usize,
-      max_view_radius_manhattan: ((view_radius2 * 2) as f32).sqrt() as usize,
-      max_attack_radius_manhattan: ((attack_radius2 * 2) as f32).sqrt() as usize,
+      min_view_radius_manhattan: (view_radius2 as f32).sqrt() as u32,
+      max_view_radius_manhattan: ((view_radius2 * 2) as f32).sqrt() as u32,
+      max_attack_radius_manhattan: ((attack_radius2 * 2) as f32).sqrt() as u32,
       enemies_count: 0,
       world: iter::repeat(Cell::Unknown).take(len).collect(),
       last_world: iter::repeat(Cell::Unknown).take(len).collect(),
@@ -170,35 +170,39 @@ impl Colony {
       enemies_anthills: Vec::with_capacity(len),
       ours_anthills: Vec::with_capacity(len),
       food: Vec::with_capacity(len),
-      log: Vec::with_capacity(turns_count * LOG_CAPACITY_CONST)
+      log: Vec::with_capacity((turns_count * LOG_CAPACITY_CONST) as usize)
     }
   }
+
   pub fn log(&self) -> &Vec<LogMessage> {
     &self.log
   }
-  pub fn width(&self) -> usize {
+
+  pub fn width(&self) -> u32 {
     self.width
   }
-  pub fn height(&self) -> usize {
+
+  pub fn height(&self) -> u32 {
     self.height
   }
-  pub fn cur_turn(&self) -> usize {
+
+  pub fn cur_turn(&self) -> u32 {
     self.cur_turn
   }
 }
 
-fn remove_ant(world: &mut Vec<Cell>, pos: usize) {
+fn remove_ant(world: &mut Vec<Cell>, pos: Pos) {
   world[pos] = match world[pos] {
     Cell::AnthillWithAnt(player) => Cell::Anthill(player),
     _ => Cell::Land
   };
 }
 
-fn set_ant(world: &mut Vec<Cell>, pos: usize, player: usize) {
+fn set_ant(world: &mut Vec<Cell>, pos: Pos, player: u32) {
   world[pos] = if world[pos] == Cell::Anthill(player) { Cell::AnthillWithAnt(player) } else { Cell::Ant(player) };
 }
 
-fn move_one(width: usize, height: usize, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut Vec<Step>, pos: usize, next_pos: usize, log: &mut Vec<LogMessage>) {
+fn move_one(width: u32, height: u32, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut Vec<Step>, pos: Pos, next_pos: Pos, log: &mut Vec<LogMessage>) {
   if !is_players_ant(world[pos], 0) {
     log.push(LogMessage::Multitask(pos, next_pos));
     return;
@@ -214,7 +218,7 @@ fn move_one(width: usize, height: usize, world: &mut Vec<Cell>, moved: &mut Vec<
   }
 }
 
-fn move_all(width: usize, height: usize, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut Vec<Step>, moves: &[(usize, usize)], log: &mut Vec<LogMessage>) {
+fn move_all(width: u32, height: u32, world: &mut Vec<Cell>, moved: &mut Vec<bool>, output: &mut Vec<Step>, moves: &[(Pos, Pos)], log: &mut Vec<LogMessage>) {
   for &(pos, next_pos) in moves {
     if is_players_ant(world[pos], 0) {
       remove_ant(world, pos);
@@ -234,7 +238,7 @@ fn move_all(width: usize, height: usize, world: &mut Vec<Cell>, moved: &mut Vec<
   }
 }
 
-fn discover_direction(width: usize, height: usize, min_view_radius_manhattan: usize, world: &[Cell], discovered_area: &[usize], dangerous_place: &[usize], tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, ant_pos: usize, rng: &mut XorShiftRng) -> Option<usize> {
+fn discover_direction(width: u32, height: u32, min_view_radius_manhattan: u32, world: &[Cell], discovered_area: &[u32], dangerous_place: &[u32], tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, ant_pos: Pos, rng: &mut XorShiftRng) -> Option<Pos> {
   let mut n_score = 0;
   let mut s_score = 0;
   let mut w_score = 0;
@@ -508,7 +512,7 @@ fn gather_food(colony: &mut Colony, output: &mut Vec<Step>) {
   clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
-fn in_one_group(width: usize, height: usize, pos1: usize, pos2: usize, attack_radius2: usize, world: &[Cell], moved: &[bool]) -> bool {
+fn in_one_group(width: u32, height: u32, pos1: Pos, pos2: Pos, attack_radius2: u32, world: &[Cell], moved: &[bool]) -> bool {
   let distance = euclidean(width, height, pos1, pos2);
   if distance <= attack_radius2 {
     return true;
@@ -620,7 +624,7 @@ fn in_one_group(width: usize, height: usize, pos1: usize, pos2: usize, attack_ra
   false
 }
 
-fn find_near_ants(width: usize, height: usize, ant_pos: usize, attack_radius2: usize, world: &[Cell], moved: &[bool], groups: &mut Vec<usize>, group_index: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, group: &mut VecDeque<usize>, ours: bool) {
+fn find_near_ants(width: u32, height: u32, ant_pos: Pos, attack_radius2: u32, world: &[Cell], moved: &[bool], groups: &mut Vec<u32>, group_index: u32, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, group: &mut VecDeque<Pos>, ours: bool) {
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, prev| {
     if groups[pos] == 0 && !moved[pos] {
       match world[pos] {
@@ -644,13 +648,13 @@ fn find_near_ants(width: usize, height: usize, ant_pos: usize, attack_radius2: u
   clear_tags(tags, tagged);
 }
 
-fn group_enough(ours_moves_count: usize, enemies_count: usize) -> bool {
+fn group_enough(ours_moves_count: u32, enemies_count: u32) -> bool {
   ours_moves_count > 21 ||
   ours_moves_count > 15 && enemies_count > 4 ||
   ours_moves_count > 11 && enemies_count > 7
 }
 
-fn get_group(width: usize, height: usize, ant_pos: usize, attack_radius2: usize, world: &[Cell], moved: &[bool], dangerous_place: &[usize], standing_ants: &[usize], groups: &mut Vec<usize>, group_index: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, ours: &mut Vec<usize>, enemies: &mut Vec<usize>) -> usize {
+fn get_group(width: u32, height: u32, ant_pos: Pos, attack_radius2: u32, world: &[Cell], moved: &[bool], dangerous_place: &[u32], standing_ants: &[u32], groups: &mut Vec<u32>, group_index: u32, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, ours: &mut Vec<Pos>, enemies: &mut Vec<Pos>) -> u32 {
   ours.clear();
   enemies.clear();
   let mut ours_moves_count = 0;
@@ -678,14 +682,14 @@ fn get_group(width: usize, height: usize, ant_pos: usize, attack_radius2: usize,
   ours_moves_count
 }
 
-fn is_near_food(width: usize, height: usize, world: &[Cell], pos: usize) -> bool { //TODO: spawn_radius2
+fn is_near_food(width: u32, height: u32, world: &[Cell], pos: Pos) -> bool { //TODO: spawn_radius2
   world[n(width, height, pos)] == Cell::Food ||
     world[s(width, height, pos)] == Cell::Food ||
     world[w(width, pos)] == Cell::Food ||
     world[e(width, pos)] == Cell::Food
 }
 
-fn is_dead(width: usize, height: usize, ant_pos: usize, attack_radius2: usize, board: &[BoardCell], tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) -> bool {
+fn is_dead(width: u32, height: u32, ant_pos: Pos, attack_radius2: u32, board: &[BoardCell], tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) -> bool {
   let mut result = false;
   let attack_value = board[ant_pos].attack;
   let ant_number = board[ant_pos].ant;
@@ -704,7 +708,7 @@ fn is_dead(width: usize, height: usize, ant_pos: usize, attack_radius2: usize, b
   result
 }
 
-fn estimate(width: usize, height: usize, world: &[Cell], attack_radius2: usize, ants: &[usize], other_ours: &[usize], board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, aggression: usize) -> isize {
+fn estimate(width: u32, height: u32, world: &[Cell], attack_radius2: u32, ants: &[Pos], other_ours: &[Pos], board: &mut Vec<BoardCell>, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, aggression: u32) -> i32 {
   let mut ours_dead_count = 0;
   let mut enemies_dead_count = 0;
   let mut our_food = 0;
@@ -738,7 +742,7 @@ fn estimate(width: usize, height: usize, world: &[Cell], attack_radius2: usize, 
       if is_enemy_anthill(world[ant_pos]) {
         destroyed_enemy_anthills += 1;
       }
-      let mut min_distance_to_enemy = usize::max_value();
+      let mut min_distance_to_enemy = u32::max_value();
       for &enemy_pos in ants {
         let enemy_board_cell = &board[enemy_pos];
         if enemy_board_cell.ant < 2 || enemy_board_cell.dead {
@@ -749,7 +753,7 @@ fn estimate(width: usize, height: usize, world: &[Cell], attack_radius2: usize, 
           min_distance_to_enemy = cur_distance;
         }
       }
-      if min_distance_to_enemy != usize::max_value() {
+      if min_distance_to_enemy != u32::max_value() {
         distance_to_enemies += min_distance_to_enemy;
       }
     } else {
@@ -764,13 +768,13 @@ fn estimate(width: usize, height: usize, world: &[Cell], attack_radius2: usize, 
   for &ant_pos in ants.iter().chain(other_ours.iter()) {
     board[ant_pos].dead = false;
   }
-  (enemies_dead_count * ENEMIES_DEAD_ESTIMATION[aggression]) as isize - (ours_dead_count * OURS_DEAD_ESTIMATION[aggression]) as isize +
-  (our_food * OUR_FOOD_ESTIMATION[aggression]) as isize - (enemy_food * ENEMY_FOOD_ESTIMATION[aggression]) as isize +
-  (destroyed_enemy_anthills * DESTROYED_ENEMY_ANTHILL_ESTIMATION[aggression]) as isize - (destroyed_our_anthills * DESTROYED_OUR_ANTHILL_ESTIMATION[aggression]) as isize -
-  (distance_to_enemies * DISTANCE_TO_ENEMIES_ESTIMATION[aggression]) as isize //TODO: штраф своему муравью за стояние на муравейнике. штраф своему муравью за стояние на одном месте. близость врага к муравейнику. точное вычисление того, кому достанется еда.
+  (enemies_dead_count * ENEMIES_DEAD_ESTIMATION[aggression as usize]) as i32 - (ours_dead_count * OURS_DEAD_ESTIMATION[aggression as usize]) as i32 +
+  (our_food * OUR_FOOD_ESTIMATION[aggression as usize]) as i32 - (enemy_food * ENEMY_FOOD_ESTIMATION[aggression as usize]) as i32 +
+  (destroyed_enemy_anthills * DESTROYED_ENEMY_ANTHILL_ESTIMATION[aggression as usize]) as i32 - (destroyed_our_anthills * DESTROYED_OUR_ANTHILL_ESTIMATION[aggression as usize]) as i32 -
+  (distance_to_enemies * DISTANCE_TO_ENEMIES_ESTIMATION[aggression as usize]) as i32 //TODO: штраф своему муравью за стояние на муравейнике. штраф своему муравью за стояние на одном месте. близость врага к муравейнику. точное вычисление того, кому достанется еда.
 }
 
-fn get_chain_begin(mut pos: usize, board: &[BoardCell]) -> usize {
+fn get_chain_begin(mut pos: Pos, board: &[BoardCell]) -> Pos {
   loop {
     let next_pos = board[pos].cycle;
     if next_pos == 0 {
@@ -781,7 +785,7 @@ fn get_chain_begin(mut pos: usize, board: &[BoardCell]) -> usize {
   pos
 }
 
-fn get_moves_count(width: usize, height: usize, pos: usize, world: &[Cell], dangerous_place: &[usize]) -> usize {
+fn get_moves_count(width: u32, height: u32, pos: Pos, world: &[Cell], dangerous_place: &[u32]) -> u32 {
   let mut result = 1;
   let mut escape = dangerous_place[pos] == 0;
   let n_pos = n(width, height, pos);
@@ -830,7 +834,7 @@ fn get_moves_count(width: usize, height: usize, pos: usize, world: &[Cell], dang
   result
 }
 
-fn get_escape_moves_count(width: usize, height: usize, pos: usize, world: &[Cell], dangerous_place: &[usize]) -> usize {
+fn get_escape_moves_count(width: u32, height: u32, pos: Pos, world: &[Cell], dangerous_place: &[u32]) -> u32 {
   let mut result = 0;
   if dangerous_place[pos] == 0 {
     result += 1;
@@ -854,7 +858,7 @@ fn get_escape_moves_count(width: usize, height: usize, pos: usize, world: &[Cell
   result
 }
 
-fn get_our_moves(width: usize, height: usize, pos: usize, world: &[Cell], dangerous_place: &[usize], board: &[BoardCell], moves: &mut Vec<usize>) {
+fn get_our_moves(width: u32, height: u32, pos: Pos, world: &[Cell], dangerous_place: &[u32], board: &[BoardCell], moves: &mut Vec<Pos>) {
   let mut escape = false;
   if board[pos].ant == 0 {
     moves.push(pos);
@@ -913,7 +917,7 @@ fn get_our_moves(width: usize, height: usize, pos: usize, world: &[Cell], danger
 }
 
 // Рассматриваем также дополнительно сбегающие ходы на наши муравейники. Для своих муравьев такое делать не нужно, так как атака муравейников идет до сражения.
-fn get_enemy_moves(width: usize, height: usize, pos: usize, world: &[Cell], dangerous_place: &[usize], board: &[BoardCell], standing_ants: &[usize], moves: &mut Vec<usize>) {
+fn get_enemy_moves(width: u32, height: u32, pos: Pos, world: &[Cell], dangerous_place: &[u32], board: &[BoardCell], standing_ants: &[u32], moves: &mut Vec<Pos>) {
   let mut escape = false;
   if board[pos].ant == 0 {
     moves.push(pos);
@@ -983,15 +987,15 @@ fn is_minimax_timeout(start_time: u64, turn_time: u32, log: &mut Vec<LogMessage>
   }
 }
 
-fn minimax_min(width: usize, height: usize, idx: usize, minimax_moved: &mut Vec<usize>, enemies: &[usize], other_ours: &[usize], world: &[Cell], dangerous_place_for_enemies: &[usize], attack_radius2: usize, board: &mut Vec<BoardCell>, standing_ants: &[usize], tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, alpha: isize, start_time: u64, turn_time: u32, aggression: usize, log: &mut Vec<LogMessage>) -> isize {
+fn minimax_min(width: u32, height: u32, idx: usize, minimax_moved: &mut Vec<Pos>, enemies: &[Pos], other_ours: &[Pos], world: &[Cell], dangerous_place_for_enemies: &[u32], attack_radius2: u32, board: &mut Vec<BoardCell>, standing_ants: &[u32], tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, alpha: i32, start_time: u64, turn_time: u32, aggression: u32, log: &mut Vec<LogMessage>) -> i32 {
   if idx < enemies.len() {
     let pos = enemies[idx];
     let mut moves = Vec::with_capacity(5);
     get_enemy_moves(width, height, pos, world, dangerous_place_for_enemies, board, standing_ants, &mut moves);
-    let mut min_estimation = isize::max_value();
+    let mut min_estimation = i32::max_value();
     for &next_pos in &moves {
       if is_minimax_timeout(start_time, turn_time, log) {
-        return isize::min_value();
+        return i32::min_value();
       }
       minimax_moved.push(next_pos);
       let ant_number = ant_owner(world[pos]).unwrap() + 1;
@@ -1042,7 +1046,7 @@ fn minimax_min(width: usize, height: usize, idx: usize, minimax_moved: &mut Vec<
   }
 }
 
-fn minimax_max(width: usize, height: usize, idx: usize, minimax_moved: &mut Vec<usize>, ours: &[usize], enemies: &mut Vec<usize>, other_ours: &[usize], world: &[Cell], dangerous_place: &[usize], dangerous_place_for_enemies: &mut Vec<usize>, attack_radius2: usize, board: &mut Vec<BoardCell>, standing_ants: &[usize], tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, alpha: &mut isize, aggression: usize, start_time: u64, turn_time: u32, best_moves: &mut Vec<usize>, log: &mut Vec<LogMessage>) {
+fn minimax_max(width: u32, height: u32, idx: usize, minimax_moved: &mut Vec<Pos>, ours: &[Pos], enemies: &mut Vec<Pos>, other_ours: &[Pos], world: &[Cell], dangerous_place: &[u32], dangerous_place_for_enemies: &mut Vec<u32>, attack_radius2: u32, board: &mut Vec<BoardCell>, standing_ants: &[u32], tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, alpha: &mut i32, aggression: u32, start_time: u64, turn_time: u32, best_moves: &mut Vec<Pos>, log: &mut Vec<LogMessage>) {
   if idx < ours.len() {
     let pos = ours[idx];
     let mut moves = Vec::with_capacity(5);
@@ -1086,7 +1090,7 @@ fn minimax_max(width: usize, height: usize, idx: usize, minimax_moved: &mut Vec<
   }
 }
 
-fn is_alone(width: usize, height: usize, attack_radius2: usize, world: &[Cell], ant_pos: usize, enemies: &[usize], tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) -> bool {
+fn is_alone(width: u32, height: u32, attack_radius2: u32, world: &[Cell], ant_pos: Pos, enemies: &[Pos], tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) -> bool {
   for &enemy_pos in enemies {
     let result = simple_wave(width, height, tags, tagged, enemy_pos, |_, _, prev| {
       euclidean(width, height, enemy_pos, prev) <= attack_radius2
@@ -1101,7 +1105,7 @@ fn is_alone(width: usize, height: usize, attack_radius2: usize, world: &[Cell], 
   true
 }
 
-fn get_other_ours(width: usize, height: usize, world: &[Cell], groups: &[usize], tmp: &mut Vec<usize>, group_index: usize, attack_radius2: usize, enemies: &[usize], other_ours: &mut Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
+fn get_other_ours(width: u32, height: u32, world: &[Cell], groups: &[u32], tmp: &mut Vec<u32>, group_index: u32, attack_radius2: u32, enemies: &[Pos], other_ours: &mut Vec<Pos>, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) {
   other_ours.clear();
   for &enemy_pos in enemies {
     simple_wave(width, height, tags, tagged, enemy_pos, |pos, _, prev| {
@@ -1122,7 +1126,7 @@ fn get_other_ours(width: usize, height: usize, world: &[Cell], groups: &[usize],
   }
 }
 
-fn add_attack(width: usize, height: usize, attack_radius2: usize, ant_pos: usize, attack_place: &mut Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
+fn add_attack(width: u32, height: u32, attack_radius2: u32, ant_pos: Pos, attack_place: &mut Vec<u32>, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) {
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
     if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
       attack_place[pos] += 1;
@@ -1134,7 +1138,7 @@ fn add_attack(width: usize, height: usize, attack_radius2: usize, ant_pos: usize
   clear_tags(tags, tagged);
 }
 
-fn remove_attack(width: usize, height: usize, attack_radius2: usize, ant_pos: usize, attack_place: &mut Vec<usize>, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
+fn remove_attack(width: u32, height: u32, attack_radius2: u32, ant_pos: Pos, attack_place: &mut Vec<u32>, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) {
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, _| {
     if euclidean(width, height, ant_pos, pos) <= attack_radius2 {
       attack_place[pos] -= 1;
@@ -1167,7 +1171,7 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
           aggression = colony.aggressive_place[pos];
         }
       }
-      if ours.len() == 1 && ENEMIES_DEAD_ESTIMATION[aggression] < OURS_DEAD_ESTIMATION[aggression] && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &enemies, &mut colony.tags, &mut colony.tagged) {
+      if ours.len() == 1 && ENEMIES_DEAD_ESTIMATION[aggression as usize] < OURS_DEAD_ESTIMATION[aggression as usize] && is_alone(colony.width, colony.height, colony.attack_radius2, &colony.world, ours[0], &enemies, &mut colony.tags, &mut colony.tagged) {
         colony.alone_ants.push(ours[0]);
         continue;
       }
@@ -1175,8 +1179,8 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
         continue;
       }
       colony.log.push(LogMessage::Group(group_index));
-      colony.log.push(LogMessage::GroupSize(ours_moves_count, enemies.len()));
-      let mut alpha = isize::min_value();
+      colony.log.push(LogMessage::GroupSize(ours_moves_count, enemies.len() as u32));
+      let mut alpha = i32::min_value();
       colony.log.push(LogMessage::Aggression(aggression));
       ours.sort_by(|&pos1, &pos2| {
         let pos1_dangerous = colony.dangerous_place[pos1] > 0;
@@ -1213,7 +1217,7 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
       for &pos in &ours {
         set_ant(&mut colony.world, pos, 0);
       }
-      if alpha != isize::min_value() {
+      if alpha != i32::min_value() {
         let mut moves = Vec::with_capacity(ours.len());
         for (i, &pos) in ours.iter().enumerate() {
           let next_pos = best_moves[i];
@@ -1232,14 +1236,14 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
   }
 }
 
-fn escape_estimation(width: usize, height: usize, world: &[Cell], dangerous_place: &[usize], estimate_pos: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) -> isize {
+fn escape_estimation(width: u32, height: u32, world: &[Cell], dangerous_place: &[u32], estimate_pos: Pos, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) -> i32 {
   let mut estimation = 0;
   simple_wave(width, height, tags, tagged, estimate_pos, |pos, path_size, _| {
     let cell = world[pos];
     if path_size > ESCAPE_PATH_SIZE || cell == Cell::Water {
       false
     } else {
-      estimation += (ESCAPE_PATH_SIZE + 1 - path_size) as isize * if is_enemy_ant(cell) {
+      estimation += (ESCAPE_PATH_SIZE + 1 - path_size) as i32 * if is_enemy_ant(cell) {
         ENEMY_ANT_ESCAPE_CONST
       } else if is_players_ant(cell, 0) {
         OURS_ANT_ESCAPE_CONST
@@ -1391,7 +1395,7 @@ fn calculate_aggressive_place(colony: &mut Colony) {
     }
     aggressive_place[pos] = NEIGHBORS_AGGRESSION[neighbors];
   }
-  if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
+  if colony.ours_anthills.len() as u32 > DANGEROUS_ANTHILLS_COUNT {
     return;
   }
   wave(colony.width, colony.height, &mut colony.tags, &mut colony.tagged, &mut colony.ours_anthills.iter(), |pos, _, path_size, _| {
@@ -1438,7 +1442,7 @@ fn calculate_dangerous_place(colony: &mut Colony) {
 
 fn defend_anhills(colony: &mut Colony, output: &mut Vec<Step>) {
   colony.log.push(LogMessage::DefendAnthills);
-  if colony.ours_anthills.len() > DANGEROUS_ANTHILLS_COUNT {
+  if colony.ours_anthills.len() as u32 > DANGEROUS_ANTHILLS_COUNT {
     return;
   }
   let world = &mut colony.world;
@@ -1525,7 +1529,7 @@ fn defend_anhills(colony: &mut Colony, output: &mut Vec<Step>) {
           colony.log.push(LogMessage::Goal(defender, defender));
           continue;
         }
-        let mut defender_path = Vec::with_capacity(colony.tags2[center_pos].length() - 1);
+        let mut defender_path = Vec::with_capacity(colony.tags2[center_pos].length() as usize - 1);
         find_path(&colony.tags2, defender, center_pos, &mut defender_path);
         clear_tags(&mut colony.tags2, &mut colony.tagged2);
         let next_pos = *defender_path.last().unwrap();
@@ -1548,7 +1552,7 @@ fn defend_anhills(colony: &mut Colony, output: &mut Vec<Step>) {
   }
 }
 
-fn get_random_move(width: usize, height: usize, world: &[Cell], dangerous_place: &[usize], rng: &mut XorShiftRng, pos: usize) -> usize {
+fn get_random_move(width: u32, height: u32, world: &[Cell], dangerous_place: &[u32], rng: &mut XorShiftRng, pos: Pos) -> Pos {
   let mut moves = Vec::with_capacity(5);
   moves.push(pos);
   let n_pos = n(width, height, pos);

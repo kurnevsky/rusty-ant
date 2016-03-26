@@ -4,7 +4,7 @@ use coordinates::*;
 pub enum Input {
   Water(Point),
   Food(Point),
-  Anthill(Point, usize),
-  Ant(Point, usize),
-  Dead(Point, usize)
+  Anthill(Point, u32),
+  Ant(Point, u32),
+  Dead(Point, u32)
 }

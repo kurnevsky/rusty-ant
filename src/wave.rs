@@ -3,9 +3,9 @@ use coordinates::*;
 
 #[derive(Clone)]
 pub struct Tag {
-  start: usize, // Координата ячейки, из которой стартовала волна.
-  prev: usize, // Координата ячейки, из которой волна пришла в текущую ячейку.
-  length: usize // Расстояние от стартовой ячейки до текущей плюс один.
+  start: Pos, // Координата ячейки, из которой стартовала волна.
+  prev: Pos, // Координата ячейки, из которой волна пришла в текущую ячейку.
+  length: u32 // Расстояние от стартовой ячейки до текущей плюс один.
 }
 
 impl Tag {
@@ -13,15 +13,15 @@ impl Tag {
     Tag { start: 0, prev: 0, length: 0 }
   }
 
-  pub fn length(&self) -> usize {
+  pub fn length(&self) -> u32 {
     self.length
   }
 }
 
-pub fn wave<'r, T, F1, F2>(width: usize, height: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, start: &mut T, mut cond: F1, mut stop_cond: F2) -> Option<usize> where
-  T: Iterator<Item=&'r usize>,
-  F1: FnMut(usize, usize, usize, usize) -> bool,
-  F2: FnMut(usize, usize, usize, usize) -> bool {
+pub fn wave<'r, T, F1, F2>(width: u32, height: u32, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, start: &mut T, mut cond: F1, mut stop_cond: F2) -> Option<Pos> where
+  T: Iterator<Item=&'r Pos>,
+  F1: FnMut(Pos, Pos, u32, Pos) -> bool,
+  F2: FnMut(Pos, Pos, u32, Pos) -> bool {
   let mut q = VecDeque::new();
   for &pos in start {
     if cond(pos, pos, 0, pos) {
@@ -79,13 +79,13 @@ pub fn wave<'r, T, F1, F2>(width: usize, height: usize, tags: &mut Vec<Tag>, tag
   None
 }
 
-pub fn simple_wave<F1, F2>(width: usize, height: usize, tags: &mut Vec<Tag>, tagged: &mut Vec<usize>, start: usize, mut cond: F1, mut stop_cond: F2) -> Option<usize> where
-  F1: FnMut(usize, usize, usize) -> bool,
-  F2: FnMut(usize, usize, usize) -> bool {
+pub fn simple_wave<F1, F2>(width: u32, height: u32, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, start: Pos, mut cond: F1, mut stop_cond: F2) -> Option<Pos> where
+  F1: FnMut(Pos, u32, Pos) -> bool,
+  F2: FnMut(Pos, u32, Pos) -> bool {
   wave(width, height, tags, tagged, &mut Some(start).iter(), |pos, _, path_size, prev| { cond(pos, path_size, prev) }, |pos, _, path_size, prev| { stop_cond(pos, path_size, prev) })
 }
 
-pub fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
+pub fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) {
   for &pos in tagged.iter() {
     let tag = &mut tags[pos];
     tag.start = 0;
@@ -96,12 +96,12 @@ pub fn clear_tags(tags: &mut Vec<Tag>, tagged: &mut Vec<usize>) {
 }
 
 /// Find the inverse path to the goal. Path includes the goal and doesn't include start position.
-pub fn find_path(tags: &[Tag], from: usize, to: usize, path: &mut Vec<usize>) {
+pub fn find_path(tags: &[Tag], from: Pos, to: Pos, path: &mut Vec<Pos>) {
   path.clear();
   if tags[to].start != from {
     return;
   }
-  path.reserve(tags[to].length - 1);
+  path.reserve(tags[to].length as usize - 1);
   let mut pos = to;
   while pos != from {
     path.push(pos);

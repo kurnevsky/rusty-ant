@@ -3,7 +3,7 @@ use coordinates::*;
 
 #[derive(Clone, PartialEq)]
 pub enum LogMessage {
-  Turn(usize),
+  Turn(u32),
   Attack,
   AttackAnthills,
   GatherFood,
@@ -13,34 +13,34 @@ pub enum LogMessage {
   Escape,
   ApproachEnemies,
   DefendAnthills,
-  Group(usize),
-  Aggression(usize),
-  Estimate(isize),
-  OursAnts(Vec<usize>),
-  OtherOursAnts(Vec<usize>),
-  EnemiesAnts(Vec<usize>),
-  GroupSize(usize, usize),
-  Goal(usize, usize),
-  Defender(usize, usize, usize),
+  Group(u32),
+  Aggression(u32),
+  Estimate(i32),
+  OursAnts(Vec<Pos>),
+  OtherOursAnts(Vec<Pos>),
+  EnemiesAnts(Vec<Pos>),
+  GroupSize(u32, u32),
+  Goal(Pos, Pos),
+  Defender(Pos, Pos, Pos),
   Timeout,
   MinimaxTimeout,
-  Multitask(usize, usize),
-  Jump(usize, usize)
+  Multitask(Pos, Pos),
+  Jump(Pos, Pos)
 }
 
-fn write_pos<T: Write>(width: usize, pos: usize, writer: &mut T) {
+fn write_pos<T: Write>(width: u32, pos: Pos, writer: &mut T) {
   let point = from_pos(width, pos);
   write!(writer, "{0}:{1}", point.y, point.x).ok();
 }
 
-fn write_ants<T: Write>(width: usize, ants: &[usize], writer: &mut T) {
+fn write_ants<T: Write>(width: u32, ants: &[Pos], writer: &mut T) {
   for &pos in ants {
     write_pos(width, pos, writer);
     write!(writer, " ").ok();
   }
 }
 
-pub fn write_log<T: Write>(width: usize, log: &[LogMessage], writer: &mut T) {
+pub fn write_log<T: Write>(width: u32, log: &[LogMessage], writer: &mut T) {
   for log_message in log {
     match *log_message {
       LogMessage::Turn(turn) => {

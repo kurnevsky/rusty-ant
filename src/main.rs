@@ -36,13 +36,13 @@ fn read_nonempty_line<T: BufRead>(reader: &mut T) -> String {
   input
 }
 
-fn read_turn<T: BufRead>(reader: &mut T) -> Option<usize> {
+fn read_turn<T: BufRead>(reader: &mut T) -> Option<u32> {
   let input = read_nonempty_line(reader);
   let split: Vec<&str> = input.as_str().trim().split(' ').collect();
   if split.len() != 2 || split[0] != "turn" {
     None
   } else {
-    usize::from_str(split[1]).ok()
+    u32::from_str(split[1]).ok()
   }
 }
 
@@ -93,7 +93,7 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
         if split.len() != 2 {
           return None;
         }
-        load_time_option = usize::from_str(split[1]).ok();
+        load_time_option = u32::from_str(split[1]).ok();
         if load_time_option.is_none() {
           return None;
         }
@@ -111,7 +111,7 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
         if split.len() != 2 {
           return None;
         }
-        height_option = usize::from_str(split[1]).ok();
+        height_option = u32::from_str(split[1]).ok();
         if height_option.is_none() {
           return None;
         }
@@ -120,7 +120,7 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
         if split.len() != 2 {
           return None;
         }
-        width_option = usize::from_str(split[1]).ok();
+        width_option = u32::from_str(split[1]).ok();
         if width_option.is_none() {
           return None;
         }
@@ -129,7 +129,7 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
         if split.len() != 2 {
           return None;
         }
-        turns_option = usize::from_str(split[1]).ok();
+        turns_option = u32::from_str(split[1]).ok();
         if turns_option.is_none() {
           return None;
         }
@@ -138,7 +138,7 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
         if split.len() != 2 {
           return None;
         }
-        view_radius2_option = usize::from_str(split[1]).ok();
+        view_radius2_option = u32::from_str(split[1]).ok();
         if view_radius2_option.is_none() {
           return None;
         }
@@ -147,7 +147,7 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
         if split.len() != 2 {
           return None;
         }
-        attack_radius2_option = usize::from_str(split[1]).ok();
+        attack_radius2_option = u32::from_str(split[1]).ok();
         if attack_radius2_option.is_none() {
           return None;
         }
@@ -156,7 +156,7 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
         if split.len() != 2 {
           return None;
         }
-        spawn_radius2_option = usize::from_str(split[1]).ok();
+        spawn_radius2_option = u32::from_str(split[1]).ok();
         if spawn_radius2_option.is_none() {
           return None;
         }
@@ -194,7 +194,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Vec<Input>> {
         if split.len() != 3 {
           return None;
         }
-        if let (Some(row), Some(col)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok()) {
+        if let (Some(row), Some(col)) = (u32::from_str(split[1]).ok(), u32::from_str(split[2]).ok()) {
           input.push(Input::Water(Point { x: col, y: row }));
         } else {
           return None;
@@ -204,7 +204,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Vec<Input>> {
         if split.len() != 3 {
           return None;
         }
-        if let (Some(row), Some(col)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok()) {
+        if let (Some(row), Some(col)) = (u32::from_str(split[1]).ok(), u32::from_str(split[2]).ok()) {
           input.push(Input::Food(Point { x: col, y: row }));
         } else {
           return None;
@@ -214,7 +214,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Vec<Input>> {
         if split.len() != 4 {
           return None;
         }
-        if let (Some(row), Some(col), Some(player)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok(), usize::from_str(split[3]).ok()) {
+        if let (Some(row), Some(col), Some(player)) = (u32::from_str(split[1]).ok(), u32::from_str(split[2]).ok(), u32::from_str(split[3]).ok()) {
           input.push(Input::Anthill(Point { x: col, y: row }, player));
         } else {
           return None;
@@ -224,7 +224,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Vec<Input>> {
         if split.len() != 4 {
           return None;
         }
-        if let (Some(row), Some(col), Some(player)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok(), usize::from_str(split[3]).ok()) {
+        if let (Some(row), Some(col), Some(player)) = (u32::from_str(split[1]).ok(), u32::from_str(split[2]).ok(), u32::from_str(split[3]).ok()) {
           input.push(Input::Ant(Point { x: col, y: row }, player));
         } else {
           return None;
@@ -234,7 +234,7 @@ fn turn_info<T: BufRead>(reader: &mut T) -> Option<Vec<Input>> {
         if split.len() != 4 {
           return None;
         }
-        if let (Some(row), Some(col), Some(player)) = (usize::from_str(split[1]).ok(), usize::from_str(split[2]).ok(), usize::from_str(split[3]).ok()) {
+        if let (Some(row), Some(col), Some(player)) = (u32::from_str(split[1]).ok(), u32::from_str(split[2]).ok(), u32::from_str(split[3]).ok()) {
           input.push(Input::Dead(Point { x: col, y: row }, player));
         } else {
           return None;
