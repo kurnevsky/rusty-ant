@@ -1112,13 +1112,13 @@ fn is_alone(width: u32, height: u32, attack_radius2: u32, world: &[Cell], ant_po
   true
 }
 
-fn get_other_ours(width: u32, height: u32, world: &[Cell], standing_ants: &[u32], groups: &[u32], tmp: &mut Vec<u32>, group_index: u32, attack_radius2: u32, enemies: &[Pos], other_ours: &mut Vec<Pos>, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) {
+fn get_other_ours(width: u32, height: u32, world: &[Cell], standing_ants: &[u32], tmp: &mut Vec<u32>, attack_radius2: u32, enemies: &[Pos], other_ours: &mut Vec<Pos>, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) {
   other_ours.clear();
   for &enemy_pos in enemies {
     let standing = standing_ants[enemy_pos] > STANDING_ANTS_CONST;
     simple_wave(width, height, tags, tagged, enemy_pos, |pos, _, prev| {
       if euclidean(width, height, enemy_pos, if standing { pos } else { prev }) <= attack_radius2 {
-        if is_players_ant(world[pos], 0) && groups[pos] != group_index && tmp[pos] == 0 {
+        if is_players_ant(world[pos], 0) && tmp[pos] == 0 {
           tmp[pos] = 1;
           other_ours.push(pos);
         }
@@ -1165,13 +1165,13 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
   let mut enemies = Vec::new();
   let mut minimax_moved = Vec::new();
   let mut best_moves = Vec::new();
-  let mut group_index = 1;
+  let mut group_index = 0;
   for &pos in &colony.ours_ants {
     if colony.moved[pos] || colony.groups[pos] != 0 {
       continue;
     }
-    let ours_moves_count = get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     group_index += 1;
+    let ours_moves_count = get_group(colony.width, colony.height, pos, colony.attack_radius2, &colony.world, &colony.moved, &colony.dangerous_place, &colony.standing_ants, &mut colony.groups, group_index, &mut colony.tags, &mut colony.tagged, &mut ours, &mut enemies);
     if !enemies.is_empty() {
       let mut aggression = 0;
       for &pos in &ours {
@@ -1210,7 +1210,7 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
       }
       colony.log.push(LogMessage::OursAnts(ours.clone()));
       colony.log.push(LogMessage::EnemiesAnts(enemies.clone()));
-      get_other_ours(colony.width, colony.height, &colony.world, &colony.standing_ants, &colony.groups, &mut colony.tmp, group_index, colony.attack_radius2, &enemies, &mut other_ours, &mut colony.tags, &mut colony.tagged);
+      get_other_ours(colony.width, colony.height, &colony.world, &colony.standing_ants, &mut colony.tmp, colony.attack_radius2, &enemies, &mut other_ours, &mut colony.tags, &mut colony.tagged);
       colony.log.push(LogMessage::OtherOursAnts(other_ours.clone()));
       for &pos in &other_ours {
         add_attack(colony.width, colony.height, colony.attack_radius2, pos, &mut colony.tmp, &mut colony.tags, &mut colony.tagged);
