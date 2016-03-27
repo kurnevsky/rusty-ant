@@ -2,13 +2,13 @@ use std::cmp;
 
 pub type Pos = usize;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Point {
   pub y: u32,
   pub x: u32
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Direction {
   North,
   South,

@@ -512,7 +512,7 @@ fn gather_food(colony: &mut Colony, output: &mut Vec<Step>) {
   clear_tags(&mut colony.tags, &mut colony.tagged);
 }
 
-fn in_one_group(width: u32, height: u32, pos1: Pos, pos2: Pos, attack_radius2: u32, world: &[Cell], moved: &[bool]) -> bool {
+fn in_one_group(width: u32, height: u32, pos1: Pos, pos2: Pos, pos1_standing: bool, attack_radius2: u32, world: &[Cell]) -> bool {
   let distance = euclidean(width, height, pos1, pos2);
   if distance <= attack_radius2 {
     return true;
@@ -533,14 +533,14 @@ fn in_one_group(width: u32, height: u32, pos1: Pos, pos2: Pos, attack_radius2: u
   let s_pos2_cell = world[s_pos2];
   let w_pos2_cell = world[w_pos2];
   let e_pos2_cell = world[e_pos2];
-  let n_pos1_busy = is_water_or_food(n_pos1_cell) || is_players_ant(n_pos1_cell, 0) && moved[n_pos1];
-  let s_pos1_busy = is_water_or_food(s_pos1_cell) || is_players_ant(s_pos1_cell, 0) && moved[s_pos1];
-  let w_pos1_busy = is_water_or_food(w_pos1_cell) || is_players_ant(w_pos1_cell, 0) && moved[w_pos1];
-  let e_pos1_busy = is_water_or_food(e_pos1_cell) || is_players_ant(e_pos1_cell, 0) && moved[e_pos1];
-  let n_pos2_busy = is_water_or_food(n_pos2_cell) || is_players_ant(n_pos2_cell, 0) && moved[n_pos2];
-  let s_pos2_busy = is_water_or_food(s_pos2_cell) || is_players_ant(s_pos2_cell, 0) && moved[s_pos2];
-  let w_pos2_busy = is_water_or_food(w_pos2_cell) || is_players_ant(w_pos2_cell, 0) && moved[w_pos2];
-  let e_pos2_busy = is_water_or_food(e_pos2_cell) || is_players_ant(e_pos2_cell, 0) && moved[e_pos2];
+  let n_pos1_busy = is_water_or_food(n_pos1_cell);
+  let s_pos1_busy = is_water_or_food(s_pos1_cell);
+  let w_pos1_busy = is_water_or_food(w_pos1_cell);
+  let e_pos1_busy = is_water_or_food(e_pos1_cell);
+  let n_pos2_busy = is_water_or_food(n_pos2_cell);
+  let s_pos2_busy = is_water_or_food(s_pos2_cell);
+  let w_pos2_busy = is_water_or_food(w_pos2_cell);
+  let e_pos2_busy = is_water_or_food(e_pos2_cell);
   if !n_pos2_busy && euclidean(width, height, pos1, n_pos2) <= attack_radius2 {
     return true;
   }
@@ -552,6 +552,9 @@ fn in_one_group(width: u32, height: u32, pos1: Pos, pos2: Pos, attack_radius2: u
   }
   if !e_pos2_busy && euclidean(width, height, pos1, e_pos2) <= attack_radius2 {
     return true;
+  }
+  if pos1_standing {
+    return false;
   }
   if !n_pos1_busy {
     let n_distance = euclidean(width, height, n_pos1, pos2);
@@ -624,26 +627,27 @@ fn in_one_group(width: u32, height: u32, pos1: Pos, pos2: Pos, attack_radius2: u
   false
 }
 
-fn find_near_ants(width: u32, height: u32, ant_pos: Pos, attack_radius2: u32, world: &[Cell], moved: &[bool], groups: &mut Vec<u32>, group_index: u32, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, group: &mut VecDeque<Pos>, ours: bool) {
+fn find_near_enemies(width: u32, height: u32, ant_pos: Pos, attack_radius2: u32, world: &[Cell], standing_ants: &[u32], groups: &mut Vec<u32>, group_index: u32, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, group: &mut VecDeque<Pos>) {
   simple_wave(width, height, tags, tagged, ant_pos, |pos, _, prev| {
-    if groups[pos] == 0 && !moved[pos] {
-      match world[pos] {
-        Cell::Ant(0) | Cell::AnthillWithAnt(0) => {
-          if ours && in_one_group(width, height, ant_pos, pos, attack_radius2, world, moved) {
-            group.push_back(pos);
-            groups[pos] = group_index;
-          }
-        },
-        Cell::Ant(_) | Cell::AnthillWithAnt(_) => {
-          if !ours && in_one_group(width, height, ant_pos, pos, attack_radius2, world, moved) {
-            group.push_back(pos);
-            groups[pos] = group_index;
-          }
-        },
-        _ => { }
+    if groups[pos] == 0 && is_enemy_ant(world[pos]) {
+      let standing = standing_ants[pos] > STANDING_ANTS_CONST;
+      if in_one_group(width, height, pos, ant_pos, standing, attack_radius2, world) {
+        group.push_back(pos);
+        groups[pos] = group_index;
       }
     }
     euclidean(width, height, ant_pos, prev) <= attack_radius2
+  }, |_, _, _| { false });
+  clear_tags(tags, tagged);
+}
+
+fn find_near_ours(width: u32, height: u32, ant_pos: Pos, standing: bool, attack_radius2: u32, world: &[Cell], moved: &[bool], groups: &mut Vec<u32>, group_index: u32, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>, group: &mut VecDeque<Pos>) {
+  simple_wave(width, height, tags, tagged, ant_pos, |pos, _, prev| {
+    if groups[pos] == 0 && is_players_ant(world[pos], 0) && !moved[pos] && in_one_group(width, height, ant_pos, pos, standing, attack_radius2, world) {
+      group.push_back(pos);
+      groups[pos] = group_index;
+    }
+    euclidean(width, height, ant_pos, if standing { pos } else { prev }) <= attack_radius2
   }, |_, _, _| { false });
   clear_tags(tags, tagged);
 }
@@ -667,13 +671,16 @@ fn get_group(width: u32, height: u32, ant_pos: Pos, attack_radius2: u32, world: 
     let pos = ours_q.pop_front().unwrap();
     ours.push(pos);
     ours_moves_count += get_moves_count(width, height, pos, world, dangerous_place);
-    find_near_ants(width, height, pos, attack_radius2, world, moved, groups, group_index, tags, tagged, &mut enemies_q, false);
+    find_near_enemies(width, height, pos, attack_radius2, world, standing_ants, groups, group_index, tags, tagged, &mut enemies_q);
     while let Some(pos) = enemies_q.pop_front() {
       enemies.push(pos);
-      if standing_ants[pos] <= STANDING_ANTS_CONST {
+      let standing = if standing_ants[pos] <= STANDING_ANTS_CONST {
         enemies_count += 1;
-      }
-      find_near_ants(width, height, pos, attack_radius2, world, moved, groups, group_index, tags, tagged, &mut ours_q, true);
+        false
+      } else {
+        true
+      };
+      find_near_ours(width, height, pos, standing, attack_radius2, world, moved, groups, group_index, tags, tagged, &mut ours_q);
     }
   }
   for &pos in ours_q.iter().chain(enemies.iter()) {
@@ -1105,11 +1112,12 @@ fn is_alone(width: u32, height: u32, attack_radius2: u32, world: &[Cell], ant_po
   true
 }
 
-fn get_other_ours(width: u32, height: u32, world: &[Cell], groups: &[u32], tmp: &mut Vec<u32>, group_index: u32, attack_radius2: u32, enemies: &[Pos], other_ours: &mut Vec<Pos>, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) {
+fn get_other_ours(width: u32, height: u32, world: &[Cell], standing_ants: &[u32], groups: &[u32], tmp: &mut Vec<u32>, group_index: u32, attack_radius2: u32, enemies: &[Pos], other_ours: &mut Vec<Pos>, tags: &mut Vec<Tag>, tagged: &mut Vec<Pos>) {
   other_ours.clear();
   for &enemy_pos in enemies {
+    let standing = standing_ants[enemy_pos] > STANDING_ANTS_CONST;
     simple_wave(width, height, tags, tagged, enemy_pos, |pos, _, prev| {
-      if euclidean(width, height, enemy_pos, prev) <= attack_radius2 {
+      if euclidean(width, height, enemy_pos, if standing { pos } else { prev }) <= attack_radius2 {
         if is_players_ant(world[pos], 0) && groups[pos] != group_index && tmp[pos] == 0 {
           tmp[pos] = 1;
           other_ours.push(pos);
@@ -1202,7 +1210,7 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
       }
       colony.log.push(LogMessage::OursAnts(ours.clone()));
       colony.log.push(LogMessage::EnemiesAnts(enemies.clone()));
-      get_other_ours(colony.width, colony.height, &colony.world, &colony.groups, &mut colony.tmp, group_index, colony.attack_radius2, &enemies, &mut other_ours, &mut colony.tags, &mut colony.tagged);
+      get_other_ours(colony.width, colony.height, &colony.world, &colony.standing_ants, &colony.groups, &mut colony.tmp, group_index, colony.attack_radius2, &enemies, &mut other_ours, &mut colony.tags, &mut colony.tagged);
       colony.log.push(LogMessage::OtherOursAnts(other_ours.clone()));
       for &pos in &other_ours {
         add_attack(colony.width, colony.height, colony.attack_radius2, pos, &mut colony.tmp, &mut colony.tags, &mut colony.tagged);
