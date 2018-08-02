@@ -5,7 +5,7 @@ pub type Pos = usize;
 #[derive(Clone, Copy, Debug)]
 pub struct Point {
   pub y: u32,
-  pub x: u32
+  pub x: u32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -13,7 +13,7 @@ pub enum Direction {
   North,
   South,
   West,
-  East
+  East,
 }
 
 pub fn length(width: u32, height: u32) -> Pos {
@@ -27,7 +27,7 @@ pub fn to_pos(width: u32, point: Point) -> Pos {
 pub fn from_pos(width: u32, pos: Pos) -> Point {
   Point {
     x: pos as u32 % width,
-    y: pos as u32 / width
+    y: pos as u32 / width,
   }
 }
 
@@ -48,28 +48,28 @@ pub fn to_direction(width: u32, height: u32, pos1: Pos, pos2: Pos) -> Option<Dir
 pub fn point_n(height: u32, point: Point) -> Point {
   Point {
     x: point.x,
-    y: (point.y + height - 1) % height
+    y: (point.y + height - 1) % height,
   }
 }
 
 pub fn point_s(height: u32, point: Point) -> Point {
   Point {
     x: point.x,
-    y: (point.y + 1) % height
+    y: (point.y + 1) % height,
   }
 }
 
 pub fn point_w(width: u32, point: Point) -> Point {
   Point {
     x: (point.x + width - 1) % width,
-    y: point.y
+    y: point.y,
   }
 }
 
 pub fn point_e(width: u32, point: Point) -> Point {
   Point {
     x: (point.x + 1) % width,
-    y: point.y
+    y: point.y,
   }
 }
 

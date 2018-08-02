@@ -6,5 +6,5 @@ pub enum Input {
   Food(Point),
   Anthill(Point, u32),
   Ant(Point, u32),
-  Dead(Point, u32)
+  Dead(Point, u32),
 }
