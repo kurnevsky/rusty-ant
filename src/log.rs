@@ -85,17 +85,17 @@ pub fn write_log<T: Write>(width: u32, log: &[LogMessage], writer: &mut T) {
       LogMessage::OursAnts(ref ants) => {
         write!(writer, "    Ours ants: ").ok();
         write_ants(width, ants, writer);
-        writeln!(writer, "").ok();
+        writeln!(writer).ok();
       },
       LogMessage::OtherOursAnts(ref ants) => {
         write!(writer, "    Other ours ants: ").ok();
         write_ants(width, ants, writer);
-        writeln!(writer, "").ok();
+        writeln!(writer).ok();
       },
       LogMessage::EnemiesAnts(ref ants) => {
         write!(writer, "    Enemies ants: ").ok();
         write_ants(width, ants, writer);
-        writeln!(writer, "").ok();
+        writeln!(writer).ok();
       },
       LogMessage::GroupSize(ours_moves_count, enemies_count) => {
         writeln!(writer, "    Group size: {0} our moves; {1} enemies.", ours_moves_count, enemies_count).ok();

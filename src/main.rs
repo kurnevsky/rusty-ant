@@ -91,81 +91,63 @@ fn init_colony<T: BufRead>(reader: &mut T) -> Option<Box<Colony>> {
           return None;
         }
         load_time_option = u32::from_str(split[1]).ok();
-        if load_time_option.is_none() {
-          return None;
-        }
+        load_time_option?;
       },
       "turntime" => {
         if split.len() != 2 {
           return None;
         }
         turn_time_option = u32::from_str(split[1]).ok();
-        if turn_time_option.is_none() {
-          return None;
-        }
+        turn_time_option?;
       },
       "rows" => {
         if split.len() != 2 {
           return None;
         }
         height_option = u32::from_str(split[1]).ok();
-        if height_option.is_none() {
-          return None;
-        }
+        height_option?;
       },
       "cols" => {
         if split.len() != 2 {
           return None;
         }
         width_option = u32::from_str(split[1]).ok();
-        if width_option.is_none() {
-          return None;
-        }
+        width_option?;
       },
       "turns" => {
         if split.len() != 2 {
           return None;
         }
         turns_option = u32::from_str(split[1]).ok();
-        if turns_option.is_none() {
-          return None;
-        }
+        turns_option?;
       },
       "viewradius2" => {
         if split.len() != 2 {
           return None;
         }
         view_radius2_option = u32::from_str(split[1]).ok();
-        if view_radius2_option.is_none() {
-          return None;
-        }
+        view_radius2_option?;
       },
       "attackradius2" => {
         if split.len() != 2 {
           return None;
         }
         attack_radius2_option = u32::from_str(split[1]).ok();
-        if attack_radius2_option.is_none() {
-          return None;
-        }
+        attack_radius2_option?;
       },
       "spawnradius2" => {
         if split.len() != 2 {
           return None;
         }
         spawn_radius2_option = u32::from_str(split[1]).ok();
-        if spawn_radius2_option.is_none() {
-          return None;
-        }
+        spawn_radius2_option?;
       },
       "player_seed" => {
         if split.len() != 2 {
           return None;
         }
         seed_option = i64::from_str(split[1]).ok();
-        if seed_option.is_none() {
-          return None;
-        }
+        seed_option?;
       },
       _ => { }
     }

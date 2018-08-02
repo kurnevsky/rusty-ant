@@ -43,25 +43,25 @@ const MINIMAX_CRITICAL_TIME: u32 = 100; // Если на ход осталось
 
 const CRITICAL_TIME: u32 = 50; // Если на ход осталось времени меньше этого количества миллисекунд, больше ничего не делаем, а только отдаем уже сделанные ходы.
 
-const ENEMIES_DEAD_ESTIMATION: &'static [u32] = &[3000, 4000, 6000, 9000, 12000, 18000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
+const ENEMIES_DEAD_ESTIMATION: &[u32] = &[3000, 4000, 6000, 9000, 12000, 18000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
 
-const OURS_DEAD_ESTIMATION: &'static [u32] = &[6000, 6000, 6000, 6000, 6000, 6000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
+const OURS_DEAD_ESTIMATION: &[u32] = &[6000, 6000, 6000, 6000, 6000, 6000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
 
-const OUR_FOOD_ESTIMATION: &'static [u32] = &[2000, 2000, 2000, 2000, 2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
+const OUR_FOOD_ESTIMATION: &[u32] = &[2000, 2000, 2000, 2000, 2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
 
-const ENEMY_FOOD_ESTIMATION: &'static [u32] = &[1000, 1500, 2000, 3000, 4000, 6000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
+const ENEMY_FOOD_ESTIMATION: &[u32] = &[1000, 1500, 2000, 3000, 4000, 6000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
 
-const DESTROYED_ENEMY_ANTHILL_ESTIMATION: &'static [u32] = &[50000, 50000, 50000, 50000, 50000, 50000];
+const DESTROYED_ENEMY_ANTHILL_ESTIMATION: &[u32] = &[50000, 50000, 50000, 50000, 50000, 50000];
 
-const DESTROYED_OUR_ANTHILL_ESTIMATION: &'static [u32] = &[50000, 50000, 50000, 50000, 50000, 50000];
+const DESTROYED_OUR_ANTHILL_ESTIMATION: &[u32] = &[50000, 50000, 50000, 50000, 50000, 50000];
 
-const DISTANCE_TO_ENEMIES_ESTIMATION: &'static [u32] = &[1, 1, 1, 1, 1, 1];
+const DISTANCE_TO_ENEMIES_ESTIMATION: &[u32] = &[1, 1, 1, 1, 1, 1];
 
 const STANDING_ANTS_CONST: u32 = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
 
 const STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST: u32 = 4;
 
-const NEIGHBORS_AGGRESSION: &'static [u32] = &[0, 0, 1, 1, 1, 2, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
+const NEIGHBORS_AGGRESSION: &[u32] = &[0, 0, 1, 1, 1, 2, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
 
 const OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: u32 = 6; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
 
@@ -150,13 +150,13 @@ impl Colony {
       ((seed >> 56) & 0xff) as u8,
     ];
     Colony {
-      width: width,
-      height: height,
-      turn_time: turn_time,
-      turns_count: turns_count,
-      view_radius2: view_radius2,
-      attack_radius2: attack_radius2,
-      spawn_radius2: spawn_radius2,
+      width,
+      height,
+      turn_time,
+      turns_count,
+      view_radius2,
+      attack_radius2,
+      spawn_radius2,
       cur_turn: 0,
       start_time: get_time(),
       rng: XorShiftRng::from_seed(seed_array),
@@ -230,7 +230,7 @@ fn move_one(width: u32, height: u32, world: &mut Vec<Cell>, moved: &mut Vec<bool
     moved[pos] = true;
     set_ant(world, next_pos, 0);
     moved[next_pos] = true;
-    output.push(Step { point: from_pos(width, pos), direction: direction })
+    output.push(Step { point: from_pos(width, pos), direction })
   } else {
     log.push(LogMessage::Jump(pos, next_pos));
   }
@@ -249,7 +249,7 @@ fn move_all(width: u32, height: u32, world: &mut Vec<Cell>, moved: &mut Vec<bool
     if let Some(direction) = to_direction(width, height, pos, next_pos) {
       set_ant(world, next_pos, 0);
       moved[next_pos] = true;
-      output.push(Step { point: from_pos(width, pos), direction: direction });
+      output.push(Step { point: from_pos(width, pos), direction });
     } else {
       log.push(LogMessage::Jump(pos, next_pos));
     }
@@ -1123,7 +1123,7 @@ fn is_alone(width: u32, height: u32, attack_radius2: u32, world: &[Cell], ant_po
       pos != ant_pos && is_players_ant(world[pos], 0)
     });
     clear_tags(tags, tagged);
-    if !result.is_none() {
+    if result.is_some() {
       return false;
     }
   }
@@ -1759,7 +1759,7 @@ fn update_world(colony: &mut Colony, input: &[Input]) {
       }, |pos, _, _| {
         last_world[pos] != Cell::Unknown && last_world[pos] != world[pos]
       });
-      if !environment_change.is_none() {
+      if environment_change.is_some() {
         colony.standing_ants[ant_pos] = STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST;
       }
       clear_tags(&mut colony.tags, &mut colony.tagged);
