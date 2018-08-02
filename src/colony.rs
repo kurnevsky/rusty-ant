@@ -131,6 +131,24 @@ pub struct Colony {
 impl Colony {
   pub fn new(width: u32, height: u32, turn_time: u32, turns_count: u32, view_radius2: u32, attack_radius2: u32, spawn_radius2: u32, seed: u64) -> Colony {
     let len = length(width, height);
+    let seed_array = [
+      2,
+      (seed & 0xff) as u8,
+      3,
+      ((seed >> 8) & 0xff) as u8,
+      5,
+      ((seed >> 16) & 0xff) as u8,
+      7,
+      ((seed >> 24) & 0xff) as u8,
+      11,
+      ((seed >> 32) & 0xff) as u8,
+      13,
+      ((seed >> 40) & 0xff) as u8,
+      17,
+      ((seed >> 48) & 0xff) as u8,
+      19,
+      ((seed >> 56) & 0xff) as u8,
+    ];
     Colony {
       width: width,
       height: height,
@@ -141,7 +159,7 @@ impl Colony {
       spawn_radius2: spawn_radius2,
       cur_turn: 0,
       start_time: get_time(),
-      rng: XorShiftRng::from_seed([1, ((seed >> 32) & 0xFFFFFFFF) as u32, 3, (seed & 0xFFFFFFFF) as u32]),
+      rng: XorShiftRng::from_seed(seed_array),
       min_view_radius_manhattan: (view_radius2 as f32).sqrt() as u32,
       max_view_radius_manhattan: ((view_radius2 * 2) as f32).sqrt() as u32,
       max_attack_radius_manhattan: ((attack_radius2 * 2) as f32).sqrt() as u32,

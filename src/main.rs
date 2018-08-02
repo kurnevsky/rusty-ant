@@ -1,10 +1,6 @@
-#![cfg_attr(feature="clippy", feature(plugin))]
-
-#![cfg_attr(feature="clippy", plugin(clippy))]
-
 #![allow(dead_code)]
-#![cfg_attr(feature="clippy", allow(too_many_arguments))]
-#![cfg_attr(feature="clippy", allow(cyclomatic_complexity))]
+#![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+#![cfg_attr(feature="cargo-clippy", allow(cyclomatic_complexity))]
 
 extern crate rand;
 
