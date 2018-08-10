@@ -26,31 +26,49 @@ const APPROACH_PATH_SIZE_CONST: u32 = 6;
 
 const ESCAPE_PATH_SIZE: u32 = 8;
 
-const GATHERING_FOOD_PATH_SIZE: u32 = 30; // Максимальное манхэттенское расстояние до еды от ближайшего муравья, при котором этот муравей за ней побежит.
+/// Maximum manhattan distance from food to our ant when this ant will go to it.
+const GATHERING_FOOD_PATH_SIZE: u32 = 30;
 
-const ATTACK_ANTHILLS_PATH_SIZE: u32 = 20; // Максимальное манхэттенское расстояние до вражеского муравейника от ближайшего муравья, при котором этот муравей за побежит к нему.
+/// Maximum manhattan distance from the nearest our ant to enemy's anthill when
+/// this ant will go to it.
+const ATTACK_ANTHILLS_PATH_SIZE: u32 = 20;
 
 const DEFEND_ANTHILLS_PATH_SIZE: u32 = 15;
 
 const DEFENDER_PATH_SIZE: u32 = 20;
 
-const ATTACK_ANTHILLS_ANTS_COUNT: u32 = 2; // Максимальное количество наших муравьев, атакующих вражеские муравеники.
+/// Maximum number of our ants that attack enemy's anthills.
+const ATTACK_ANTHILLS_ANTS_COUNT: u32 = 2;
 
-const DANGEROUS_ANTHILLS_COUNT: u32 = 3; // Если муравейников больше этого количества, не защищаем их вообще.
+/// If we have more than this number of anthills don't protect them at all.
+const DANGEROUS_ANTHILLS_COUNT: u32 = 3;
 
-const DEFEND_ANTHILLS_COUNT: u32 = 2; // Максимальное количество атакуемых своих муравейников, которые мы будем защищать.
+/// Maximum number of our attacked anthills that we will defend.
+const DEFEND_ANTHILLS_COUNT: u32 = 2;
 
-const MINIMAX_CRITICAL_TIME: u32 = 100; // Если на ход осталось времени меньше этого количества миллисекунд, останавливаем минимакс и продолжаем вычислять ходы другими методами.
+/// If we have left time for turn less then this number of milliseconds then we
+/// stop minimax and continue calculating moves with other methods.
+const MINIMAX_CRITICAL_TIME: u32 = 100;
 
-const CRITICAL_TIME: u32 = 50; // Если на ход осталось времени меньше этого количества миллисекунд, больше ничего не делаем, а только отдаем уже сделанные ходы.
+/// If we have left time for turn less then this number of milliseconds then we
+/// stop doing anything but returning moves that are made already.
+const CRITICAL_TIME: u32 = 50;
 
-const ENEMIES_DEAD_ESTIMATION: &[u32] = &[3000, 4000, 6000, 9000, 12000, 18000]; // На эту константу умножается количество убитых вражеских муравьев при оценке позиции.
+/// Number of dead hostile ants will be multiplied by this constant when we
+/// estimate the position.
+const ENEMIES_DEAD_ESTIMATION: &[u32] = &[3000, 4000, 6000, 9000, 12000, 18000];
 
-const OURS_DEAD_ESTIMATION: &[u32] = &[6000, 6000, 6000, 6000, 6000, 6000]; // На эту константу умножается количество убитых своих муравьев при оценке позиции.
+/// Number of dead our ants will be multiplied by this constant when we estimate
+/// the position.
+const OURS_DEAD_ESTIMATION: &[u32] = &[6000, 6000, 6000, 6000, 6000, 6000];
 
-const OUR_FOOD_ESTIMATION: &[u32] = &[2000, 2000, 2000, 2000, 2000, 2000]; // На эту константу умножается количество своих муравьев, которые находятся на расстоянии сбора от еды.
+/// Number of our ants that are located at a food gathering distance will be
+/// multiplied by this constant when we estimate the position.
+const OUR_FOOD_ESTIMATION: &[u32] = &[2000, 2000, 2000, 2000, 2000, 2000];
 
-const ENEMY_FOOD_ESTIMATION: &[u32] = &[1000, 1500, 2000, 3000, 4000, 6000]; // На эту константу умножается количество вражеских муравьев, которые находятся на расстоянии сбора от еды.
+/// Number of hostile ants that are located at a food gathering distance will be
+/// multiplied by this constant when we estimate the position.
+const ENEMY_FOOD_ESTIMATION: &[u32] = &[1000, 1500, 2000, 3000, 4000, 6000];
 
 const DESTROYED_ENEMY_ANTHILL_ESTIMATION: &[u32] = &[50000, 50000, 50000, 50000, 50000, 50000];
 
@@ -58,15 +76,21 @@ const DESTROYED_OUR_ANTHILL_ESTIMATION: &[u32] = &[50000, 50000, 50000, 50000, 5
 
 const DISTANCE_TO_ENEMIES_ESTIMATION: &[u32] = &[1, 1, 1, 1, 1, 1];
 
-const STANDING_ANTS_CONST: u32 = 4; // Если муравей находится на одном месте дольше этого числа ходов, считаем, что он и дальше будет стоять.
+/// If an ant stays in the same cell more than this number of turns we expect
+/// that it won't move anymore.
+const STANDING_ANTS_CONST: u32 = 4;
 
 const STANDING_ANTS_WITH_CHANGED_ENVIRONMENT_CONST: u32 = 4;
 
-const NEIGHBORS_AGGRESSION: &[u32] = &[0, 0, 1, 1, 1, 2, 3, 4, 5]; // Уровни агрессии для муравья от числа его соседей.
+/// Aggression levels depending on number of neighbors.
+const NEIGHBORS_AGGRESSION: &[u32] = &[0, 0, 1, 1, 1, 2, 3, 4, 5];
 
-const OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: u32 = 6; // Максимальное манхэттенское расстояние от нашего муравейника до нашего муравья, при котором он считается агрессивным, а с ним и вся группа.
+/// Maximum manhattan distance from our anthill to our ant when it is considered
+/// aggressive (and the whole group with it).
+const OURS_ANTHILLS_PATH_SIZE_FOR_AGGRESSIVE: u32 = 6;
 
-const OURS_ANTHILLS_AGGRESSION: u32 = 2; // Уровень агрессии для наших муравьев, близких к нашим муравейникам.
+/// Aggression level for our ants that are close to our anthills.
+const OURS_ANTHILLS_AGGRESSION: u32 = 2;
 
 const ENEMY_ANT_ESCAPE_CONST: i32 = -7;
 
@@ -80,52 +104,84 @@ const LOG_CAPACITY_CONST: u32 = 100;
 
 #[derive(Clone)]
 struct BoardCell {
-  ant: u32, /* Номер игрока, чей муравей сделал ход в текущую клетку, плюс один. */
-  attack: u32, // Количество врагов, атакующих муравья.
-  cycle: Pos, /* Клитка, из которой сделал ход муравей в текущую. Нужно для отсечения циклов (хождений муравьев по кругу). */
-  dead: bool, /* Помечаются флагом погибшие в битве свои и чужие муравьи. */
+  /// Index of player whose ant made a move in the current cell, +1.
+  ant: u32,
+  /// Number of enemies that attack the ant.
+  attack: u32,
+  /// Cell from which the ant made a move to the current cell. Needed for
+  /// preventing ants to move in a cycle.
+  cycle: Pos,
+  /// Mark for our or enemy's dead in battle ants.
+  dead: bool,
 }
 
 #[derive(Clone)]
 pub struct Colony {
-  width: u32,       // Ширина поля.
-  height: u32,      // Высота поля.
-  turn_time: u32,   // Время на один ход.
-  turns_count: u32, // Количество ходов в игре.
+  /// Field width.
+  width: u32,
+  /// Field height.
+  height: u32,
+  /// Time for one turn.
+  turn_time: u32,
+  /// Number of turns in the game.
+  turns_count: u32,
   view_radius2: u32,
   attack_radius2: u32,
   spawn_radius2: u32,
-  cur_turn: u32,    // Номер текущего хода.
-  start_time: u64,  // Время начала хода.
-  rng: XorShiftRng, // Генератор случайных чисел.
+  /// Current turn number.
+  cur_turn: u32,
+  /// Time when the current turn started.
+  start_time: u64,
+  /// Random numbers generator.
+  rng: XorShiftRng,
   min_view_radius_manhattan: u32,
   max_view_radius_manhattan: u32,
   max_attack_radius_manhattan: u32,
-  enemies_count: u32,     // Известное количество врагов.
-  world: Vec<Cell>, /* Текущее состояние мира. При ходе нашего муравья он передвигается на новую клетку. */
-  last_world: Vec<Cell>, /* Предыдущее состояние мира со сделавшими ход нашими муравьями. */
-  visible_area: Vec<u32>, /* Равняется 0 для видимых клеток и известной воды, для остальных увеличивается на 1 перед каждым ходом. */
+  /// Known number of enemies.
+  enemies_count: u32,
+  /// Current state of the world. When our ant makes a move it sifts to a new
+  /// cell.
+  world: Vec<Cell>,
+  /// Previous state of the world with our ants made a move.
+  last_world: Vec<Cell>,
+  /// 0 for visible cells and water, otherwise incremented by 1 before each
+  /// turn.
+  visible_area: Vec<u32>,
   discovered_area: Vec<u32>,
-  standing_ants: Vec<u32>, /* Каждый ход увеличивается на 1 для вражеских муравьев (при условии, что у них не изменилось окружение) и сбрасывается в 0 для всех остальных клеток. То есть показывает, сколько ходов на месте стоит вражеский муравей. */
-  moved: Vec<bool>, /* Помечаются флагом клетки, откуда сделал ход наш муравей, а также куда он сделал ход. */
-  gathered_food: Vec<Pos>, /* Помечается флагом клетки с едой, к которым отправлен наш муравей. Значение - позиция муравья + 1. */
+  /// Every turn increases by 1 for hostile ants (if their neighborhood is
+  /// unchanged) and resets to 0 for all other cells. It means that this value
+  /// shows how long a hostile ant stand still.
+  standing_ants: Vec<u32>,
+  /// All cells from or to which our ant made a move will be marked with this
+  /// flag.
+  moved: Vec<bool>,
+  /// Cell with food to which our ant is sent. The value is ant coordinate + 1.
+  gathered_food: Vec<Pos>,
   territory: Vec<u32>,
-  dangerous_place: Vec<u32>, /* Количество вражеских муравьев, которые могут атаковать клетку на следующем ходу. */
+  /// Number of hostile ants that can attack the cell on the next turn.
+  dangerous_place: Vec<u32>,
   aggressive_place: Vec<u32>,
   groups: Vec<u32>,
   fighting: Vec<bool>,
   board: Vec<BoardCell>,
   tmp: Vec<u32>,
   alone_ants: Vec<Pos>,
-  tags: Vec<Tag>,      // Тэги для волнового алгоритма.
-  tagged: Vec<Pos>, /* Список позиций start_tags и path_tags с ненулевыми значениями. */
-  tags2: Vec<Tag>,  // Вторые тэги для волнового алгоритма.
-  tagged2: Vec<Pos>, /* Список позиций start_tags и path_tags во вторых тэгах с ненулевыми значениями. */
-  ours_ants: Vec<Pos>, /* Список наших муравьев. Если муравей сделал ход, позиция помечена в moved. */
+  /// Tags for the Lee algorithm.
+  tags: Vec<Tag>,
+  /// List of coordinates start_tags and path_tags with non zero values.
+  tagged: Vec<Pos>,
+  /// Second tags for the Lee algorithm.
+  tags2: Vec<Tag>,
+  /// List of coordinates start_tags and path_tags in tags2 with non zero values.
+  tagged2: Vec<Pos>,
+  /// List of our ants. If an ant made a move the cell is marked as moved.
+  ours_ants: Vec<Pos>,
   enemies_ants: Vec<Pos>,
   enemies_anthills: Vec<Pos>,
-  ours_anthills: Vec<Pos>, /* Список клеток с нашими муравейниками (как в видимой области, так и за туманом войны). */
-  food: Vec<Pos>, /* Список клеток с едой (как в видимой области, так и за туманом войны, если видели там еду раньше). */
+  /// List of cells with our anthills (both visible and beyond the fog of war).
+  ours_anthills: Vec<Pos>,
+  /// List of cells with food (both visible and beyond the fog of war).
+  food: Vec<Pos>,
   log: Vec<LogMessage>,
 }
 
@@ -420,7 +476,8 @@ fn discover_direction(
     clear_tags(tags, tagged);
   }
   if n_score == 0 && s_score == 0 && w_score == 0 && e_score == 0 {
-    // При равенстве можно было бы учитывать расстояние до своих муравьев, однако на это нужно слишком много вычислений, поэтому выбираем случайно.
+    // It'd be better to calculate the distance to our ants but it requires too
+    // many calculations so we choose move randomly.
     None
   } else {
     let mut next_pos = n_pos;
