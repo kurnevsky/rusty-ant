@@ -14,7 +14,6 @@ use rand::{Rng, SeedableRng, XorShiftRng};
 use std::{
   cmp::{self, Ordering},
   collections::VecDeque,
-  iter,
 };
 use step::*;
 use time::*;
@@ -172,7 +171,8 @@ pub struct Colony {
   tagged: Vec<Pos>,
   /// Second tags for the Lee algorithm.
   tags2: Vec<Tag>,
-  /// List of coordinates start_tags and path_tags in tags2 with non zero values.
+  /// List of coordinates start_tags and path_tags in tags2 with non zero
+  /// values.
   tagged2: Vec<Pos>,
   /// List of our ants. If an ant made a move the cell is marked as moved.
   ours_ants: Vec<Pos>,
@@ -230,30 +230,32 @@ impl Colony {
       max_view_radius_manhattan: ((view_radius2 * 2) as f32).sqrt() as u32,
       max_attack_radius_manhattan: ((attack_radius2 * 2) as f32).sqrt() as u32,
       enemies_count: 0,
-      world: iter::repeat(Cell::Unknown).take(len).collect(),
-      last_world: iter::repeat(Cell::Unknown).take(len).collect(),
-      visible_area: iter::repeat(0).take(len).collect(),
-      discovered_area: iter::repeat(0).take(len).collect(),
-      standing_ants: iter::repeat(0).take(len).collect(),
-      moved: iter::repeat(false).take(len).collect(),
-      gathered_food: iter::repeat(0).take(len).collect(),
-      territory: iter::repeat(0).take(len).collect(),
-      dangerous_place: iter::repeat(0).take(len).collect(),
-      aggressive_place: iter::repeat(0).take(len).collect(),
-      groups: iter::repeat(0).take(len).collect(),
-      fighting: iter::repeat(false).take(len).collect(),
-      board: iter::repeat(BoardCell {
-        ant: 0,
-        attack: 0,
-        cycle: 0,
-        dead: false,
-      }).take(len)
-      .collect(),
-      tmp: iter::repeat(0).take(len).collect(),
+      world: vec![Cell::Unknown; len],
+      last_world: vec![Cell::Unknown; len],
+      visible_area: vec![0; len],
+      discovered_area: vec![0; len],
+      standing_ants: vec![0; len],
+      moved: vec![false; len],
+      gathered_food: vec![0; len],
+      territory: vec![0; len],
+      dangerous_place: vec![0; len],
+      aggressive_place: vec![0; len],
+      groups: vec![0; len],
+      fighting: vec![false; len],
+      board: vec![
+        BoardCell {
+          ant: 0,
+          attack: 0,
+          cycle: 0,
+          dead: false,
+        };
+        len
+      ],
+      tmp: vec![0; len],
       alone_ants: Vec::with_capacity(len),
-      tags: iter::repeat(Tag::new()).take(len).collect(),
+      tags: vec![Tag::new(); len],
       tagged: Vec::with_capacity(len),
-      tags2: iter::repeat(Tag::new()).take(len).collect(),
+      tags2: vec![Tag::new(); len],
       tagged2: Vec::with_capacity(len),
       ours_ants: Vec::with_capacity(len),
       enemies_ants: Vec::with_capacity(len),
@@ -672,15 +674,14 @@ fn attack_anthills(colony: &mut Colony, output: &mut Vec<Step>) {
         return false;
       }
       match world[pos] {
-        Cell::Ant(0) | Cell::AnthillWithAnt(0) if !moved[pos] =>
-          if !is_free(world[prev]) {
-            false
-          } else {
-            tmp[start_pos] += 1;
-            move_one(width, height, world, moved, output, pos, prev, log);
-            log.push(LogMessage::Goal(pos, start_pos));
-            true
-          },
+        Cell::Ant(0) | Cell::AnthillWithAnt(0) if !moved[pos] => if !is_free(world[prev]) {
+          false
+        } else {
+          tmp[start_pos] += 1;
+          move_one(width, height, world, moved, output, pos, prev, log);
+          log.push(LogMessage::Goal(pos, start_pos));
+          true
+        },
         Cell::Unknown | Cell::Water => false,
         _ => true,
       }
