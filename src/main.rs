@@ -3,6 +3,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
 
 extern crate rand;
+extern crate rand_xorshift;
 
 use crate::colony::*;
 use crate::coordinates::*;

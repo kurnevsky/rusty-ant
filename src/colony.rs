@@ -13,7 +13,9 @@ use crate::log::*;
 use crate::step::*;
 use crate::time::*;
 use crate::wave::*;
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::{Rng, SeedableRng};
+use rand::seq::SliceRandom;
+use rand_xorshift::XorShiftRng;
 use std::{
   cmp::{self, Ordering},
   collections::VecDeque,
@@ -2427,8 +2429,8 @@ fn move_random(colony: &mut Colony, output: &mut Vec<Step>) {
 }
 
 fn shuffle(colony: &mut Colony) {
-  colony.rng.shuffle(&mut colony.ours_ants);
-  colony.rng.shuffle(&mut colony.enemies_ants);
+  colony.ours_ants.shuffle(&mut colony.rng);
+  colony.enemies_ants.shuffle(&mut colony.rng);
   colony.ours_anthills.sort();
   colony.enemies_anthills.sort();
 }
