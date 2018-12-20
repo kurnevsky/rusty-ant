@@ -1,4 +1,4 @@
-use coordinates::{Direction, Point};
+use crate::coordinates::{Direction, Point};
 
 pub struct Step {
   pub point: Point,

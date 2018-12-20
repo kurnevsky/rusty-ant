@@ -1,4 +1,4 @@
-use coordinates::*;
+use crate::coordinates::*;
 use std::io::Write;
 
 #[derive(Clone, PartialEq)]

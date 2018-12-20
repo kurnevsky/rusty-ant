@@ -4,15 +4,15 @@
 
 extern crate rand;
 
-use colony::*;
-use coordinates::*;
-use input::*;
-use log::*;
+use crate::colony::*;
+use crate::coordinates::*;
+use crate::input::*;
+use crate::log::*;
 use std::{
   io::{self, BufRead, BufReader, Write},
   str::FromStr,
 };
-use step::*;
+use crate::step::*;
 
 mod cell;
 mod colony;

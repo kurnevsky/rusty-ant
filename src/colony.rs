@@ -6,18 +6,18 @@
 // TODO: 2. попыка вычислить итеративно точку равновесие Нэша - для своих стоящих на месте муравьев вычислить лучший ход противника, затем для этого лучшего хода вычислить наш лучший ход, и так далее. Делать так либо пока не достигнут предел итераций либо лучшие ответы перестанут меняться.
 // TODO: 3. в минимаксе вычислять не худший для нас, а лучший для врага ход. При этом придется отказаться от альфа-отсечния.
 
-use cell::*;
-use coordinates::*;
-use input::*;
-use log::*;
+use crate::cell::*;
+use crate::coordinates::*;
+use crate::input::*;
+use crate::log::*;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use std::{
   cmp::{self, Ordering},
   collections::VecDeque,
 };
-use step::*;
-use time::*;
-use wave::*;
+use crate::step::*;
+use crate::time::*;
+use crate::wave::*;
 
 const TERRITORY_PATH_SIZE_CONST: u32 = 5;
 

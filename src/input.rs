@@ -1,4 +1,4 @@
-use coordinates::*;
+use crate::coordinates::*;
 
 #[derive(Clone, Copy)]
 pub enum Input {

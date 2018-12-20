@@ -1,4 +1,4 @@
-use coordinates::*;
+use crate::coordinates::*;
 use std::collections::VecDeque;
 
 #[derive(Clone)]
