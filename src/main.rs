@@ -8,11 +8,11 @@ use crate::colony::*;
 use crate::coordinates::*;
 use crate::input::*;
 use crate::log::*;
+use crate::step::*;
 use std::{
   io::{self, BufRead, BufReader, Write},
   str::FromStr,
 };
-use crate::step::*;
 
 mod cell;
 mod colony;
@@ -253,7 +253,8 @@ fn print_output<T: Write>(writer: &mut T, output: &mut Vec<Step>) {
         Direction::West => 'W',
         Direction::East => 'E',
       }
-    ).ok();
+    )
+    .ok();
   }
   writeln!(writer, "go").ok();
 }

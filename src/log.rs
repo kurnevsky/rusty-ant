@@ -102,7 +102,8 @@ pub fn write_log<T: Write>(width: u32, log: &[LogMessage], writer: &mut T) {
           writer,
           "    Group size: {0} our moves; {1} enemies.",
           ours_moves_count, enemies_count
-        ).ok();
+        )
+        .ok();
       }
       LogMessage::Goal(ant_pos, goal_pos) => {
         write!(writer, "    Ours ant ").ok();

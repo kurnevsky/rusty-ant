@@ -10,14 +10,14 @@ use crate::cell::*;
 use crate::coordinates::*;
 use crate::input::*;
 use crate::log::*;
+use crate::step::*;
+use crate::time::*;
+use crate::wave::*;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use std::{
   cmp::{self, Ordering},
   collections::VecDeque,
 };
-use crate::step::*;
-use crate::time::*;
-use crate::wave::*;
 
 const TERRITORY_PATH_SIZE_CONST: u32 = 5;
 
@@ -674,14 +674,16 @@ fn attack_anthills(colony: &mut Colony, output: &mut Vec<Step>) {
         return false;
       }
       match world[pos] {
-        Cell::Ant(0) | Cell::AnthillWithAnt(0) if !moved[pos] => if !is_free(world[prev]) {
-          false
-        } else {
-          tmp[start_pos] += 1;
-          move_one(width, height, world, moved, output, pos, prev, log);
-          log.push(LogMessage::Goal(pos, start_pos));
-          true
-        },
+        Cell::Ant(0) | Cell::AnthillWithAnt(0) if !moved[pos] => {
+          if !is_free(world[prev]) {
+            false
+          } else {
+            tmp[start_pos] += 1;
+            move_one(width, height, world, moved, output, pos, prev, log);
+            log.push(LogMessage::Goal(pos, start_pos));
+            true
+          }
+        }
         Cell::Unknown | Cell::Water => false,
         _ => true,
       }
@@ -743,7 +745,7 @@ fn gather_food(colony: &mut Colony, output: &mut Vec<Step>) {
         return false;
       }
       match world[pos] {
-        Cell::Ant(0) | Cell::AnthillWithAnt(0) if gathered_food[start_pos] == 0 && !moved[pos] =>
+        Cell::Ant(0) | Cell::AnthillWithAnt(0) if gathered_food[start_pos] == 0 && !moved[pos] => {
           if pos != start_pos && !is_free(world[prev]) {
             false
           } else {
@@ -751,7 +753,8 @@ fn gather_food(colony: &mut Colony, output: &mut Vec<Step>) {
             gathered_food[start_pos] = pos + 1;
             log.push(LogMessage::Goal(pos, start_pos));
             true
-          },
+          }
+        }
         Cell::Unknown | Cell::Water => false,
         _ => true,
       }
@@ -1811,7 +1814,8 @@ fn attack(colony: &mut Colony, output: &mut Vec<Step>) {
           &enemies,
           &mut colony.tags,
           &mut colony.tagged,
-        ) {
+        )
+      {
         colony.alone_ants.push(ours[0]);
         continue;
       }
@@ -1968,17 +1972,18 @@ fn escape_estimation(
       if path_size > ESCAPE_PATH_SIZE || cell == Cell::Water {
         false
       } else {
-        estimation += (ESCAPE_PATH_SIZE + 1 - path_size) as i32 * if is_enemy_ant(cell) {
-          ENEMY_ANT_ESCAPE_CONST
-        } else if is_players_ant(cell, 0) {
-          OURS_ANT_ESCAPE_CONST
-        } else if cell == Cell::Food {
-          FOOD_ESCAPE_CONST
-        } else if dangerous_place[pos] == 0 {
-          SAFE_PLACE_ESCAPE_CONST
-        } else {
-          0
-        };
+        estimation += (ESCAPE_PATH_SIZE + 1 - path_size) as i32
+          * if is_enemy_ant(cell) {
+            ENEMY_ANT_ESCAPE_CONST
+          } else if is_players_ant(cell, 0) {
+            OURS_ANT_ESCAPE_CONST
+          } else if cell == Cell::Food {
+            FOOD_ESCAPE_CONST
+          } else if dangerous_place[pos] == 0 {
+            SAFE_PLACE_ESCAPE_CONST
+          } else {
+            0
+          };
         true
       }
     },
@@ -2319,7 +2324,8 @@ fn defend_anhills(colony: &mut Colony, output: &mut Vec<Step>) {
             pos == defender || cell != Cell::Water && (prev != defender || is_free(cell) && dangerous_place[pos] == 0)
           },
           |pos, _, _| pos == center_pos,
-        ).is_none();
+        )
+        .is_none();
         if path_not_found {
           clear_tags(&mut colony.tags2, &mut colony.tagged2);
           colony.moved[defender] = true;
@@ -2438,7 +2444,7 @@ fn update_world(colony: &mut Colony, input: &[Input]) {
   let last_world = &mut colony.last_world;
   let world = &mut colony.world;
   let len = length(width, height);
-  for pos in 0 .. len {
+  for pos in 0..len {
     last_world[pos] = world[pos];
     world[pos] = Cell::Unknown;
     colony.moved[pos] = false;
@@ -2525,7 +2531,7 @@ fn update_world(colony: &mut Colony, input: &[Input]) {
     );
     clear_tags(&mut colony.tags, &mut colony.tagged);
   }
-  for pos in 0 .. len {
+  for pos in 0..len {
     if visible_area[pos] == 0 {
       if world[pos] == Cell::Unknown {
         world[pos] = match last_world[pos] {
@@ -2571,7 +2577,7 @@ fn update_world(colony: &mut Colony, input: &[Input]) {
       colony.standing_ants[pos] = 0;
     }
   }
-  for ant_pos in 0 .. len {
+  for ant_pos in 0..len {
     if colony.standing_ants[ant_pos] > STANDING_ANTS_CONST {
       let environment_change = simple_wave(
         width,
