@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 #![allow(clippy::too_many_arguments)]
-#![allow(clippy::cyclomatic_complexity)]
+#![allow(clippy::cognitive_complexity)]
 
 extern crate rand;
 extern crate rand_xorshift;
