@@ -2431,8 +2431,8 @@ fn move_random(colony: &mut Colony, output: &mut Vec<Step>) {
 fn shuffle(colony: &mut Colony) {
   colony.ours_ants.shuffle(&mut colony.rng);
   colony.enemies_ants.shuffle(&mut colony.rng);
-  colony.ours_anthills.sort();
-  colony.enemies_anthills.sort();
+  colony.ours_anthills.sort_unstable();
+  colony.enemies_anthills.sort_unstable();
 }
 
 fn update_world(colony: &mut Colony, input: &[Input]) {

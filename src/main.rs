@@ -299,7 +299,6 @@ fn main() {
     }
     None => {
       writeln!(stderr, "Icorrect input 4!").ok();
-      return;
     }
   }
 }
