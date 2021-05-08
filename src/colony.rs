@@ -2207,7 +2207,7 @@ fn calculate_dangerous_place(colony: &mut Colony) {
   }
 }
 
-fn defend_anhills(colony: &mut Colony, output: &mut Vec<Step>) {
+fn defend_anthills(colony: &mut Colony, output: &mut Vec<Step>) {
   colony.log.push(LogMessage::DefendAnthills);
   if colony.ours_anthills.len() as u32 > DANGEROUS_ANTHILLS_COUNT {
     return;
@@ -2215,7 +2215,7 @@ fn defend_anhills(colony: &mut Colony, output: &mut Vec<Step>) {
   let world = &mut colony.world;
   let dangerous_place = &colony.dangerous_place;
   let tmp = &mut colony.tmp;
-  let mut defended_anhills = 0;
+  let mut defended_anthills = 0;
   let mut path = Vec::new();
   let mut defenders = Vec::new();
   for &anthill_pos in &colony.ours_anthills {
@@ -2337,8 +2337,8 @@ fn defend_anhills(colony: &mut Colony, output: &mut Vec<Step>) {
     }
     clear_tags(&mut colony.tags, &mut colony.tagged);
     if defended {
-      defended_anhills += 1;
-      if defended_anhills > DEFEND_ANTHILLS_COUNT {
+      defended_anthills += 1;
+      if defended_anthills > DEFEND_ANTHILLS_COUNT {
         break;
       }
     }
@@ -2629,7 +2629,7 @@ pub fn turn(colony: &mut Colony, input: &[Input], output: &mut Vec<Step>) {
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) {
     return;
   }
-  defend_anhills(colony, output);
+  defend_anthills(colony, output);
   if is_timeout(colony.start_time, colony.turn_time, &mut colony.log) {
     return;
   }
