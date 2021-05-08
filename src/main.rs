@@ -2,9 +2,6 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::cognitive_complexity)]
 
-extern crate rand;
-extern crate rand_xorshift;
-
 use crate::colony::*;
 use crate::coordinates::*;
 use crate::input::*;
@@ -21,7 +18,6 @@ mod coordinates;
 mod input;
 mod log;
 mod step;
-mod time;
 mod wave;
 
 fn read_nonempty_line<T: BufRead>(reader: &mut T) -> String {

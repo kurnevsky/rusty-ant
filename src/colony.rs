@@ -11,14 +11,13 @@ use crate::coordinates::*;
 use crate::input::*;
 use crate::log::*;
 use crate::step::*;
-use crate::time::*;
 use crate::wave::*;
-use rand::{Rng, SeedableRng};
 use rand::seq::SliceRandom;
-use rand_xorshift::XorShiftRng;
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::{
   cmp::{self, Ordering},
   collections::VecDeque,
+  time::Instant,
 };
 
 const TERRITORY_PATH_SIZE_CONST: u32 = 5;
@@ -132,9 +131,9 @@ pub struct Colony {
   /// Current turn number.
   cur_turn: u32,
   /// Time when the current turn started.
-  start_time: u64,
+  start_time: Instant,
   /// Random numbers generator.
-  rng: XorShiftRng,
+  rng: SmallRng,
   min_view_radius_manhattan: u32,
   max_view_radius_manhattan: u32,
   max_attack_radius_manhattan: u32,
@@ -199,24 +198,6 @@ impl Colony {
     seed: u64,
   ) -> Colony {
     let len = length(width, height);
-    let seed_array = [
-      2,
-      (seed & 0xff) as u8,
-      3,
-      ((seed >> 8) & 0xff) as u8,
-      5,
-      ((seed >> 16) & 0xff) as u8,
-      7,
-      ((seed >> 24) & 0xff) as u8,
-      11,
-      ((seed >> 32) & 0xff) as u8,
-      13,
-      ((seed >> 40) & 0xff) as u8,
-      17,
-      ((seed >> 48) & 0xff) as u8,
-      19,
-      ((seed >> 56) & 0xff) as u8,
-    ];
     Colony {
       width,
       height,
@@ -226,8 +207,8 @@ impl Colony {
       attack_radius2,
       spawn_radius2,
       cur_turn: 0,
-      start_time: get_time(),
-      rng: XorShiftRng::from_seed(seed_array),
+      start_time: Instant::now(),
+      rng: SmallRng::seed_from_u64(seed),
       min_view_radius_manhattan: (view_radius2 as f32).sqrt() as u32,
       max_view_radius_manhattan: ((view_radius2 * 2) as f32).sqrt() as u32,
       max_attack_radius_manhattan: ((attack_radius2 * 2) as f32).sqrt() as u32,
@@ -369,7 +350,7 @@ fn discover_direction(
   tags: &mut Vec<Tag>,
   tagged: &mut Vec<Pos>,
   ant_pos: Pos,
-  rng: &mut XorShiftRng,
+  rng: &mut SmallRng,
 ) -> Option<Pos> {
   let mut n_score = 0;
   let mut s_score = 0;
@@ -1152,7 +1133,8 @@ fn estimate(
     - (enemy_food * ENEMY_FOOD_ESTIMATION[aggression as usize]) as i32
     + (destroyed_enemy_anthills * DESTROYED_ENEMY_ANTHILL_ESTIMATION[aggression as usize]) as i32
     - (destroyed_our_anthills * DESTROYED_OUR_ANTHILL_ESTIMATION[aggression as usize]) as i32
-    - (distance_to_enemies * DISTANCE_TO_ENEMIES_ESTIMATION[aggression as usize]) as i32 // TODO: штраф своему муравью за стояние на муравейнике. штраф своему муравью за стояние на одном месте. близость врага к муравейнику. точное вычисление того, кому достанется еда.
+    - (distance_to_enemies * DISTANCE_TO_ENEMIES_ESTIMATION[aggression as usize]) as i32
+  // TODO: штраф своему муравью за стояние на муравейнике. штраф своему муравью за стояние на одном месте. близость врага к муравейнику. точное вычисление того, кому достанется еда.
 }
 
 fn get_chain_begin(mut pos: Pos, board: &[BoardCell]) -> Pos {
@@ -1376,8 +1358,8 @@ fn get_enemy_moves(
   }
 }
 
-fn is_minimax_timeout(start_time: u64, turn_time: u32, log: &mut Vec<LogMessage>) -> bool {
-  if elapsed_time(start_time) + MINIMAX_CRITICAL_TIME > turn_time {
+fn is_minimax_timeout(start_time: Instant, turn_time: u32, log: &mut Vec<LogMessage>) -> bool {
+  if start_time.elapsed().as_millis() as u32 + MINIMAX_CRITICAL_TIME > turn_time {
     log.push(LogMessage::MinimaxTimeout);
     true
   } else {
@@ -1400,7 +1382,7 @@ fn minimax_min(
   tags: &mut Vec<Tag>,
   tagged: &mut Vec<Pos>,
   alpha: i32,
-  start_time: u64,
+  start_time: Instant,
   turn_time: u32,
   aggression: u32,
   log: &mut Vec<LogMessage>,
@@ -1536,7 +1518,7 @@ fn minimax_max(
   tagged: &mut Vec<Pos>,
   alpha: &mut i32,
   aggression: u32,
-  start_time: u64,
+  start_time: Instant,
   turn_time: u32,
   best_moves: &mut Vec<Pos>,
   log: &mut Vec<LogMessage>,
@@ -2371,7 +2353,7 @@ fn get_random_move(
   height: u32,
   world: &[Cell],
   dangerous_place: &[u32],
-  rng: &mut XorShiftRng,
+  rng: &mut SmallRng,
   pos: Pos,
 ) -> Pos {
   let mut moves = Vec::with_capacity(5);
@@ -2392,7 +2374,7 @@ fn get_random_move(
   if is_free(world[e_pos]) && dangerous_place[e_pos] == 0 {
     moves.push(e_pos);
   }
-  moves[rng.gen_range(0, moves.len())]
+  moves[rng.gen_range(0..moves.len())]
 }
 
 fn move_random(colony: &mut Colony, output: &mut Vec<Step>) {
@@ -2598,8 +2580,8 @@ fn update_world(colony: &mut Colony, input: &[Input]) {
   }
 }
 
-fn is_timeout(start_time: u64, turn_time: u32, log: &mut Vec<LogMessage>) -> bool {
-  if elapsed_time(start_time) + CRITICAL_TIME > turn_time {
+fn is_timeout(start_time: Instant, turn_time: u32, log: &mut Vec<LogMessage>) -> bool {
+  if start_time.elapsed().as_millis() as u32 + CRITICAL_TIME > turn_time {
     log.push(LogMessage::Timeout);
     true
   } else {
@@ -2608,7 +2590,7 @@ fn is_timeout(start_time: u64, turn_time: u32, log: &mut Vec<LogMessage>) -> boo
 }
 
 pub fn turn(colony: &mut Colony, input: &[Input], output: &mut Vec<Step>) {
-  colony.start_time = get_time();
+  colony.start_time = Instant::now();
   output.clear();
   colony.cur_turn += 1;
   colony.log.push(LogMessage::Turn(colony.cur_turn));
